@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: catalogo-tom-hanks
+    restart: always
+    ports:
+      - "8228:3000"
+    environment:
+      - PORT=3000
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - DB_HOST=35.226.64.52
+      - DB_USER=IAC_2026_02_yago_martins
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=IAC_2026_02_yago_martins
+      - DB_PORT=3306
+      - SESSION_SECRET=${SESSION_SECRET}
