@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Acesso — Catálogo Tom Hanks</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <h2 id="auth-title">Entrar</h2>
+    <div id="auth-error" class="alert error hidden"></div>
+    
+    <form id="auth-form">
+      <div id="field-nome" class="form-group hidden">
+        <label>Nome</label>
+        <input type="text" id="nome">
+      </div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="email" required>
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="senha" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="btn-submit">Entrar</button>
+    </form>
+
+    <p class="auth-toggle">
+      <span id="toggle-text">Não tem uma conta?</span>
+      <a href="#" id="toggle-auth">Cadastre-se</a>
+    </p>
+  </div>
+
+  <script>
+    let isRegister = false;
+    const form = document.getElementById('auth-form');
+    const toggleAuth = document.getElementById('toggle-auth');
+    const authTitle = document.getElementById('auth-title');
+    const fieldNome = document.getElementById('field-nome');
+    const btnSubmit = document.getElementById('btn-submit');
+    const authError = document.getElementById('auth-error');
+
+    toggleAuth.addEventListener('click', (e) => {
+      e.preventDefault();
+      isRegister = !isRegister;
+      authTitle.innerText = isRegister ? 'Criar Conta' : 'Entrar';
+      btnSubmit.innerText = isRegister ? 'Cadastrar' : 'Entrar';
+      fieldNome.classList.toggle('hidden', !isRegister);
+      document.getElementById('toggle-text').innerText = isRegister ? 'Já possui conta?' : 'Não tem uma conta?';
+      toggleAuth.innerText = isRegister ? 'Faça login' : 'Cadastre-se';
+      authError.classList.add('hidden');
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.classList.add('hidden');
+
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const nome = document.getElementById('nome').value;
+
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const body = isRegister ? { nome, email, senha } : { email, senha };
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro na autenticação.');
+
+        window.location.href = '/';
+      } catch (err) {
+        authError.innerText = err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

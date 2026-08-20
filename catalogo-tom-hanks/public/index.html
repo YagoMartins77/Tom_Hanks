@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Catálogo — Tom Hanks</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-content">
+      <h1>🎬 Catálogo Tom Hanks</h1>
+      <div class="user-area">
+        <span id="user-display">Carregando...</span>
+        <button id="btn-logout" class="btn btn-secondary">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="grid-layout" id="filmes-grid">
+      <p>Buscando filmes ao vivo da TMDB...</p>
+    </section>
+  </main>
+
+  <script>
+    let favoritosSet = new Set();
+    let comentariosMap = {};
+
+    async function init() {
+      // 1. Checa autenticação
+      const meRes = await fetch('/api/auth/me');
+      if (!meRes.ok) {
+        window.location.href = '/auth.html';
+        return;
+      }
+      const meData = await meRes.json();
+      document.getElementById('user-display').innerText = `Olá, ${meData.usuario.nome}`;
+
+      // 2. Carrega dados do usuário (isolados)
+      await carregarDadosUsuario();
+
+      // 3. Carrega filmes da API externa
+      await carregarFilmes();
+    }
+
+    async function carregarDadosUsuario() {
+      const [favRes, comRes] = await Promise.all([
+        fetch('/api/favoritos'),
+        fetch('/api/comentarios')
+      ]);
+
+      const favs = await favRes.json();
+      favoritosSet = new Set(favs.map(f => f.tmdb_movie_id));
+
+      const coms = await comRes.json();
+      comentariosMap = {};
+      coms.forEach(c => {
+        if (!comentariosMap[c.tmdb_movie_id]) comentariosMap[c.tmdb_movie_id] = [];
+        comentariosMap[c.tmdb_movie_id].push(c);
+      });
+    }
+
+    async function carregarFilmes() {
+      const grid = document.getElementById('filmes-grid');
+      try {
+        const res = await fetch('/api/filmes');
+        const filmes = await res.json();
+        grid.innerHTML = '';
+
+        filmes.forEach(filme => {
+          const isFav = favoritosSet.has(filme.id);
+          const comentarios = comentariosMap[filme.id] || [];
+
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <img src="${filme.poster_path || 'https://via.placeholder.com/500x750?text=Sem+Poster'}" alt="${filme.title}">
+            <div class="card-body">
+              <h3>${filme.title}</h3>
+              <p class="overview">${filme.overview}</p>
+              
+              <button class="btn ${isFav ? 'btn-fav-active' : 'btn-fav'}" onclick="toggleFavorito(${filme.id}, '${filme.title.replace(/'/g, "\\'")}', '${filme.raw_poster_path || ''}', ${isFav})">
+                ${isFav ? '★ Favorito' : '☆ Favoritar'}
+              </button>
+
+              <div class="comentarios-box">
+                <h4>Seus comentários:</h4>
+                <ul id="com-list-${filme.id}">
+                  ${comentarios.map(c => `<li>${c.texto}</li>`).join('')}
+                </ul>
+                <div class="comment-input-row">
+                  <input type="text" id="input-com-${filme.id}" placeholder="Escreva uma nota...">
+                  <button class="btn btn-small" onclick="adicionarComentario(${filme.id})">Enviar</button>
+                </div>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {
+        grid.innerHTML = '<p class="alert error">Erro ao carregar o catálogo.</p>';
+      }
+    }
+
+    async function toggleFavorito(movieId, titulo, posterPath, isFav) {
+      if (isFav) {
+        await fetch(`/api/favoritos/${movieId}`, { method: 'DELETE' });
+      } else {
+        await fetch('/api/favoritos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tmdb_movie_id: movieId, titulo, poster_path: posterPath })
+        });
+      }
+      await carregarDadosUsuario();
+      await carregarFilmes();
+    }
+
+    async function adicionarComentario(movieId) {
+      const input = document.getElementById(`input-com-${movieId}`);
+      const texto = input.value.trim();
+      if (!texto) return;
+
+      await fetch('/api/comentarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tmdb_movie_id: movieId, texto })
+      });
+
+      input.value = '';
+      await carregarDadosUsuario();
+      await carregarFilmes();
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/auth.html';
+    });
+
+    init();
+  </script>
+</body>
+</html>
