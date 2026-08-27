@@ -2,142 +2,233 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Catálogo — Tom Hanks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo Tom Hanks</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Importando FontAwesome para as estrelas (favoritos) e lupa -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <header class="navbar">
-    <div class="container nav-content">
-      <h1>🎬 Catálogo Tom Hanks</h1>
-      <div class="user-area">
-        <span id="user-display">Carregando...</span>
-        <button id="btn-logout" class="btn btn-secondary">Sair</button>
+  <header>
+    <div class="header-content">
+      <h1>Catálogo Tom Hanks</h1>
+      
+      <!-- Barra de Pesquisa -->
+      <div class="search-container">
+        <i class="fas fa-search lupa-icon"></i>
+        <input type="text" id="searchInput" placeholder="Pesquisar filme..." onkeyup="pesquisarFilme()">
+      </div>
+
+      <div class="user-menu">
+        <span id="userName"></span>
+        <button onclick="fazerLogout()" class="btn-sair">Sair</button>
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="grid-layout" id="filmes-grid">
-      <p>Buscando filmes ao vivo da TMDB...</p>
-    </section>
+  <!-- Mensagem de Confirmação (Toast) -->
+  <div id="toastMensagem" class="toast hidden"></div>
+
+  <main>
+    <div id="listaFilmes" class="grid-filmes">
+      <!-- Os cartões dos filmes serão gerados aqui -->
+    </div>
   </main>
 
+  <!-- Cartão Expandido (Modal) -->
+  <div id="filmeModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="fechar-modal" onclick="fecharModal()">&times;</span>
+      
+      <div class="modal-body">
+        <img id="modalPoster" src="" alt="Poster do Filme">
+        <div class="modal-info">
+          <h2 id="modalTitulo"></h2>
+          <h3>Sinopse</h3>
+          <p id="modalSinopse">Sinopse não disponível.</p>
+          
+          <hr>
+          
+          <h3>Comentários</h3>
+          <div id="listaComentarios" class="comentarios-container"></div>
+          
+          <div class="comentario-form">
+            <input type="text" id="novoComentario" placeholder="Escreva um comentário...">
+            <button onclick="adicionarComentario()">Comentar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    let favoritosSet = new Set();
-    let comentariosMap = {};
+    let filmesGlobais = [];
+    let favoritosIds = new Set();
+    let filmeAtualExpandido = null;
 
-    async function init() {
-      // 1. Checa autenticação
-      const meRes = await fetch('/api/auth/me');
-      if (!meRes.ok) {
-        window.location.href = '/auth.html';
-        return;
+    // 1. Carregar Dados ao abrir a página
+    async function iniciarCatalogo() {
+      try {
+        // Busca os dados do usuário
+        const userRes = await fetch('/api/auth/me');
+        if (!userRes.ok) return window.location.href = 'auth.html';
+        const user = await userRes.json();
+        document.getElementById('userName').textContent = `Olá, ${user.nome}`;
+
+        // Busca os favoritos para saber quais estrelas preencher
+        const favRes = await fetch('/api/favoritos');
+        const favoritos = await favRes.json();
+        favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
+
+        // Busca os filmes
+        const filmesRes = await fetch('/api/filmes');
+        filmesGlobais = await filmesRes.json();
+        
+        renderizarFilmes(filmesGlobais);
+      } catch (err) {
+        mostrarToast('Erro ao carregar catálogo', 'erro');
       }
-      const meData = await meRes.json();
-      document.getElementById('user-display').innerText = `Olá, ${meData.usuario.nome}`;
-
-      // 2. Carrega dados do usuário (isolados)
-      await carregarDadosUsuario();
-
-      // 3. Carrega filmes da API externa
-      await carregarFilmes();
     }
 
-    async function carregarDadosUsuario() {
-      const [favRes, comRes] = await Promise.all([
-        fetch('/api/favoritos'),
-        fetch('/api/comentarios')
-      ]);
+    // 2. Renderizar Filmes na Tela
+    function renderizarFilmes(filmes) {
+      const container = document.getElementById('listaFilmes');
+      container.innerHTML = '';
 
-      const favs = await favRes.json();
-      favoritosSet = new Set(favs.map(f => f.tmdb_movie_id));
+      filmes.forEach(filme => {
+        if (!filme.poster_path) return; // Pula filmes sem imagem
 
-      const coms = await comRes.json();
-      comentariosMap = {};
-      coms.forEach(c => {
-        if (!comentariosMap[c.tmdb_movie_id]) comentariosMap[c.tmdb_movie_id] = [];
-        comentariosMap[c.tmdb_movie_id].push(c);
+        const isFav = favoritosIds.has(filme.id);
+        const estrelaClass = isFav ? 'fas fa-star fav-active' : 'far fa-star fav-inactive';
+
+        const cartao = document.createElement('div');
+        cartao.className = 'filme-card';
+        // O clique no cartão abre o modal, exceto se clicar na estrela
+        cartao.onclick = () => abrirModal(filme);
+
+        cartao.innerHTML = `
+          <div class="poster-container">
+            <img src="https://image.tmdb.org/t/p/w500${filme.poster_path}" alt="${filme.title}">
+            <!-- Estrela de Favorito -->
+            <i class="${estrelaClass} estrela-btn" 
+               onclick="toggleFavorito(event, ${filme.id}, '${filme.title.replace(/'/g, "\\'")}', '${filme.poster_path}')">
+            </i>
+          </div>
+          <div class="card-info">
+            <h3>${filme.title}</h3>
+            <p>${filme.release_date ? filme.release_date.split('-')[0] : ''}</p>
+          </div>
+        `;
+        container.appendChild(cartao);
       });
     }
 
-    async function carregarFilmes() {
-      const grid = document.getElementById('filmes-grid');
+    // 3. Barra de Pesquisa (Lupa)
+    function pesquisarFilme() {
+      const termo = document.getElementById('searchInput').value.toLowerCase();
+      const filmesFiltrados = filmesGlobais.filter(filme => 
+        filme.title.toLowerCase().includes(termo)
+      );
+      renderizarFilmes(filmesFiltrados);
+    }
+
+    // 4. Lógica da Estrela (Favoritar/Desfavoritar)
+    async function toggleFavorito(event, id, titulo, poster) {
+      event.stopPropagation(); // Impede que o clique na estrela abra o modal
+      const icone = event.target;
+      const isFav = favoritosIds.has(id);
+
       try {
-        const res = await fetch('/api/filmes');
-        const filmes = await res.json();
-        grid.innerHTML = '';
-
-        filmes.forEach(filme => {
-          const isFav = favoritosSet.has(filme.id);
-          const comentarios = comentariosMap[filme.id] || [];
-
-          const card = document.createElement('div');
-          card.className = 'card';
-          card.innerHTML = `
-            <img src="${filme.poster_path || 'https://via.placeholder.com/500x750?text=Sem+Poster'}" alt="${filme.title}">
-            <div class="card-body">
-              <h3>${filme.title}</h3>
-              <p class="overview">${filme.overview}</p>
-              
-              <button class="btn ${isFav ? 'btn-fav-active' : 'btn-fav'}" onclick="toggleFavorito(${filme.id}, '${filme.title.replace(/'/g, "\\'")}', '${filme.raw_poster_path || ''}', ${isFav})">
-                ${isFav ? '★ Favorito' : '☆ Favoritar'}
-              </button>
-
-              <div class="comentarios-box">
-                <h4>Seus comentários:</h4>
-                <ul id="com-list-${filme.id}">
-                  ${comentarios.map(c => `<li>${c.texto}</li>`).join('')}
-                </ul>
-                <div class="comment-input-row">
-                  <input type="text" id="input-com-${filme.id}" placeholder="Escreva uma nota...">
-                  <button class="btn btn-small" onclick="adicionarComentario(${filme.id})">Enviar</button>
-                </div>
-              </div>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
+        if (isFav) {
+          await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
+          favoritosIds.delete(id);
+          icone.className = 'far fa-star fav-inactive estrela-btn';
+          mostrarToast('Removido dos favoritos!');
+        } else {
+          await fetch('/api/favoritos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tmdb_movie_id: id, titulo, poster_path: poster })
+          });
+          favoritosIds.add(id);
+          icone.className = 'fas fa-star fav-active estrela-btn';
+          mostrarToast('Adicionado aos favoritos!');
+        }
       } catch (err) {
-        grid.innerHTML = '<p class="alert error">Erro ao carregar o catálogo.</p>';
+        mostrarToast('Erro ao favoritar', 'erro');
       }
     }
 
-    async function toggleFavorito(movieId, titulo, posterPath, isFav) {
-      if (isFav) {
-        await fetch(`/api/favoritos/${movieId}`, { method: 'DELETE' });
-      } else {
-        await fetch('/api/favoritos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tmdb_movie_id: movieId, titulo, poster_path: posterPath })
-        });
-      }
-      await carregarDadosUsuario();
-      await carregarFilmes();
+    // 5. Cartão Expandido (Modal) e Comentários
+    function abrirModal(filme) {
+      filmeAtualExpandido = filme;
+      document.getElementById('modalTitulo').textContent = filme.title;
+      document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível em português.';
+      document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
+      
+      document.getElementById('filmeModal').classList.remove('hidden');
+      document.getElementById('novoComentario').value = '';
+      
+      carregarComentarios(filme.id);
     }
 
-    async function adicionarComentario(movieId) {
-      const input = document.getElementById(`input-com-${movieId}`);
-      const texto = input.value.trim();
-      if (!texto) return;
+    function fecharModal() {
+      document.getElementById('filmeModal').classList.add('hidden');
+      filmeAtualExpandido = null;
+    }
+
+    async function carregarComentarios(movieId) {
+      const container = document.getElementById('listaComentarios');
+      container.innerHTML = 'Carregando...';
+      const res = await fetch(`/api/comentarios/${movieId}`);
+      const comentarios = await res.json();
+      
+      container.innerHTML = '';
+      if (comentarios.length === 0) {
+        container.innerHTML = '<p class="sem-comentarios">Seja o primeiro a comentar!</p>';
+        return;
+      }
+
+      comentarios.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'comentario-item';
+        div.innerHTML = `<strong>${c.nome}:</strong> <span>${c.texto}</span>`;
+        container.appendChild(div);
+      });
+    }
+
+    async function adicionarComentario() {
+      const texto = document.getElementById('novoComentario').value;
+      if (!texto.trim() || !filmeAtualExpandido) return;
 
       await fetch('/api/comentarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tmdb_movie_id: movieId, texto })
+        body: JSON.stringify({ tmdb_movie_id: filmeAtualExpandido.id, texto })
       });
 
-      input.value = '';
-      await carregarDadosUsuario();
-      await carregarFilmes();
+      document.getElementById('novoComentario').value = '';
+      carregarComentarios(filmeAtualExpandido.id);
+      mostrarToast('Comentário publicado!');
     }
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/auth.html';
-    });
+    // 6. Mensagem de Confirmação (Toast)
+    function mostrarToast(mensagem, tipo = 'sucesso') {
+      const toast = document.getElementById('toastMensagem');
+      toast.textContent = mensagem;
+      toast.className = `toast show ${tipo}`;
+      setTimeout(() => {
+        toast.className = 'toast hidden';
+      }, 3000); // Some após 3 segundos
+    }
 
-    init();
+    async function fazerLogout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = 'auth.html';
+    }
+
+    // Iniciar
+    iniciarCatalogo();
   </script>
 </body>
 </html>
