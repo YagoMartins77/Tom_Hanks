@@ -24,6 +24,7 @@
     </div>
   </header>
 
+  <!-- Mensagem de Confirmação (Toast) -->
   <div id="toastMensagem" class="toast hidden"></div>
 
   <main>
@@ -44,8 +45,7 @@
           <!-- Título e Estrela lado a lado -->
           <div class="modal-header-top">
             <h2 id="modalTitulo"></h2>
-            <!-- A estrela agora fica aqui! -->
-            <i id="modalEstrela" class="far fa-star estrela-btn-modal" onclick="toggleFavoritoModal(event)"></i>
+            <i id="modalEstrela" class="far fa-star estrela-btn-modal" onclick="toggleFavoritoModal()"></i>
           </div>
 
           <h3>Sinopse</h3>
@@ -70,6 +70,7 @@
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
 
+    // Inicia a tela
     async function iniciarCatalogo() {
       try {
         const userRes = await fetch('/api/auth/me');
@@ -78,18 +79,22 @@
         document.getElementById('userName').textContent = `Olá, ${user.nome}`;
 
         const favRes = await fetch('/api/favoritos');
-        const favoritos = await favRes.json();
-        favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
+        if (favRes.ok) {
+          const favoritos = await favRes.json();
+          favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
+        }
 
         const filmesRes = await fetch('/api/filmes');
-        filmesGlobais = await filmesRes.json();
-        
-        renderizarFilmes(filmesGlobais);
+        if (filmesRes.ok) {
+          filmesGlobais = await filmesRes.json();
+          renderizarFilmes(filmesGlobais);
+        }
       } catch (err) {
-        mostrarToast('Erro ao carregar catálogo', 'erro');
+        mostrarToast('Erro ao carregar o catálogo', 'erro');
       }
     }
 
+    // Renderiza os filmes
     function renderizarFilmes(filmes) {
       const container = document.getElementById('listaFilmes');
       container.innerHTML = '';
@@ -99,9 +104,8 @@
 
         const cartao = document.createElement('div');
         cartao.className = 'filme-card';
-        cartao.onclick = () => abrirModal(filme); // O cartão inteiro é um botão
+        cartao.onclick = () => abrirModal(filme); // O cartão todo é clicável
 
-        // O cartão agora só tem a foto e o nome, sem estrela
         cartao.innerHTML = `
           <div class="poster-container">
             <img src="https://image.tmdb.org/t/p/w500${filme.poster_path}" alt="${filme.title}">
@@ -115,6 +119,7 @@
       });
     }
 
+    // Lupa de pesquisa
     function pesquisarFilme() {
       const termo = document.getElementById('searchInput').value.toLowerCase();
       const filmesFiltrados = filmesGlobais.filter(filme => 
@@ -123,13 +128,13 @@
       renderizarFilmes(filmesFiltrados);
     }
 
+    // Abrir o Modal
     function abrirModal(filme) {
       filmeAtualExpandido = filme;
       document.getElementById('modalTitulo').textContent = filme.title;
-      document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível em português.';
+      document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível.';
       document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
       
-      // Verifica se é favorito e pinta a estrela de dentro do modal
       const modalEstrela = document.getElementById('modalEstrela');
       if (favoritosIds.has(filme.id)) {
         modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
@@ -143,27 +148,38 @@
       carregarComentarios(filme.id);
     }
 
+    // Fechar o Modal
     function fecharModal() {
       document.getElementById('filmeModal').classList.add('hidden');
       filmeAtualExpandido = null;
     }
 
-    // Função de favoritar acionada pelo ícone dentro do modal
-    async function toggleFavoritoModal(event) {
+    // Fechar Modal clicando no fundo escuro
+    window.addEventListener('click', function(event) {
+      const modal = document.getElementById('filmeModal');
+      if (event.target === modal) {
+        fecharModal();
+      }
+    });
+
+    // Lógica da Estrela (Favoritos) blindada contra erros
+    async function toggleFavoritoModal() {
       if (!filmeAtualExpandido) return;
       
       const id = filmeAtualExpandido.id;
-      const icone = event.target;
+      const modalEstrela = document.getElementById('modalEstrela');
       const isFav = favoritosIds.has(id);
 
       try {
         if (isFav) {
-          await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
+          const res = await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Erro ao remover');
+
           favoritosIds.delete(id);
-          icone.className = 'far fa-star fav-inactive estrela-btn-modal';
+          modalEstrela.className = 'far fa-star fav-inactive estrela-btn-modal';
           mostrarToast('Removido dos favoritos!');
         } else {
-          await fetch('/api/favoritos', {
+          const res = await fetch('/api/favoritos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -172,50 +188,68 @@
               poster_path: filmeAtualExpandido.poster_path 
             })
           });
+          if (!res.ok) throw new Error('Erro ao favoritar');
+
           favoritosIds.add(id);
-          icone.className = 'fas fa-star fav-active estrela-btn-modal';
+          modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
           mostrarToast('Adicionado aos favoritos!');
         }
       } catch (err) {
-        mostrarToast('Erro ao favoritar', 'erro');
+        mostrarToast('Erro ao atualizar favorito', 'erro');
       }
     }
 
+    // Carregar comentários
     async function carregarComentarios(movieId) {
       const container = document.getElementById('listaComentarios');
       container.innerHTML = 'Carregando...';
-      const res = await fetch(`/api/comentarios/${movieId}`);
-      const comentarios = await res.json();
       
-      container.innerHTML = '';
-      if (comentarios.length === 0) {
-        container.innerHTML = '<p class="sem-comentarios">Seja o primeiro a comentar!</p>';
-        return;
-      }
+      try {
+        const res = await fetch(`/api/comentarios/${movieId}`);
+        if (!res.ok) throw new Error('Erro ao buscar');
+        
+        const comentarios = await res.json();
+        
+        container.innerHTML = '';
+        if (!Array.isArray(comentarios) || comentarios.length === 0) {
+          container.innerHTML = '<p class="sem-comentarios">Seja o primeiro a comentar!</p>';
+          return;
+        }
 
-      comentarios.forEach(c => {
-        const div = document.createElement('div');
-        div.className = 'comentario-item';
-        div.innerHTML = `<strong>${c.nome}:</strong> <span>${c.texto}</span>`;
-        container.appendChild(div);
-      });
+        comentarios.forEach(c => {
+          const div = document.createElement('div');
+          div.className = 'comentario-item';
+          div.innerHTML = `<strong>${c.nome}:</strong> <span>${c.texto}</span>`;
+          container.appendChild(div);
+        });
+      } catch (err) {
+        container.innerHTML = '<p class="sem-comentarios" style="color:#e50914;">Erro ao carregar os comentários.</p>';
+      }
     }
 
+    // Adicionar comentário
     async function adicionarComentario() {
       const texto = document.getElementById('novoComentario').value;
       if (!texto.trim() || !filmeAtualExpandido) return;
 
-      await fetch('/api/comentarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tmdb_movie_id: filmeAtualExpandido.id, texto })
-      });
+      try {
+        const res = await fetch('/api/comentarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tmdb_movie_id: filmeAtualExpandido.id, texto })
+        });
 
-      document.getElementById('novoComentario').value = '';
-      carregarComentarios(filmeAtualExpandido.id);
-      mostrarToast('Comentário publicado!');
+        if (!res.ok) throw new Error('Falha ao postar');
+
+        document.getElementById('novoComentario').value = '';
+        carregarComentarios(filmeAtualExpandido.id);
+        mostrarToast('Comentário publicado!');
+      } catch (err) {
+        mostrarToast('Erro ao publicar comentário', 'erro');
+      }
     }
 
+    // Toast
     function mostrarToast(mensagem, tipo = 'sucesso') {
       const toast = document.getElementById('toastMensagem');
       toast.textContent = mensagem;
@@ -225,6 +259,7 @@
       }, 3000);
     }
 
+    // Logout
     async function fazerLogout() {
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = 'auth.html';
