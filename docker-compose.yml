@@ -13,7 +13,7 @@ services:
     container_name: catalogo-tom-hanks-yago # Nome único
     restart: always
     ports:
-      - "8255:3000"
+      - "8228:3000"
     environment:
       - PORT=3000
       - AUTH_SERVICE_URL=http://auth-service:3001
