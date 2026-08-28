@@ -3,7 +3,9 @@ version: '3.8'
 networks:
   app-network:
     driver: bridge
-
+    ipam:
+      config:
+        - subnet: 10.99.0.0/16
 services:
   catalogo-service:
     build: ./catalogo-service
