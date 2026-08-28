@@ -2,66 +2,68 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Acesso — Catálogo Tom Hanks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Catálogo Tom Hanks</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="auth-page">
   <div class="auth-card">
-    <h2 id="auth-title">Entrar</h2>
-    <div id="auth-error" class="alert error hidden"></div>
+    <h2 id="formTitle">Entrar</h2>
     
-    <form id="auth-form">
-      <div id="field-nome" class="form-group hidden">
-        <label>Nome</label>
-        <input type="text" id="nome">
-      </div>
-      <div class="form-group">
-        <label>E-mail</label>
-        <input type="email" id="email" required>
-      </div>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="senha" required>
-      </div>
-      <button type="submit" class="btn btn-primary" id="btn-submit">Entrar</button>
+    <form id="authForm">
+      <!-- O campo nome começa com display: none -->
+      <input type="text" id="nome" placeholder="Seu Nome" style="display: none;">
+      <input type="email" id="email" placeholder="E-mail" required>
+      <input type="password" id="senha" placeholder="Senha" required>
+      <button type="submit" id="submitBtn">Entrar</button>
     </form>
-
-    <p class="auth-toggle">
-      <span id="toggle-text">Não tem uma conta?</span>
-      <a href="#" id="toggle-auth">Cadastre-se</a>
+    
+    <p id="toggleText">
+      Não tem uma conta? <a onclick="toggleForm()">Cadastre-se</a>
     </p>
+    
+    <p id="msgErro" style="margin-top: 15px; font-weight: bold; text-align: center;"></p>
   </div>
 
   <script>
-    let isRegister = false;
-    const form = document.getElementById('auth-form');
-    const toggleAuth = document.getElementById('toggle-auth');
-    const authTitle = document.getElementById('auth-title');
-    const fieldNome = document.getElementById('field-nome');
-    const btnSubmit = document.getElementById('btn-submit');
-    const authError = document.getElementById('auth-error');
+    let isLogin = true;
 
-    toggleAuth.addEventListener('click', (e) => {
+    // Função que alterna entre Login e Cadastro
+    function toggleForm() {
+      isLogin = !isLogin;
+      const nomeInput = document.getElementById('nome');
+      const title = document.getElementById('formTitle');
+      const btn = document.getElementById('submitBtn');
+      const toggle = document.getElementById('toggleText');
+      const msg = document.getElementById('msgErro');
+      
+      msg.textContent = ''; // Limpa mensagens de erro
+
+      if (isLogin) {
+        nomeInput.style.display = 'none'; // Esconde o nome
+        nomeInput.required = false;
+        title.textContent = 'Entrar';
+        btn.textContent = 'Entrar';
+        toggle.innerHTML = 'Não tem uma conta? <a onclick="toggleForm()">Cadastre-se</a>';
+      } else {
+        nomeInput.style.display = 'block'; // Mostra o nome
+        nomeInput.required = true;
+        title.textContent = 'Cadastrar';
+        btn.textContent = 'Cadastrar';
+        toggle.innerHTML = 'Já tem uma conta? <a onclick="toggleForm()">Faça Login</a>';
+      }
+    }
+
+    // Função que envia os dados para o backend
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      isRegister = !isRegister;
-      authTitle.innerText = isRegister ? 'Criar Conta' : 'Entrar';
-      btnSubmit.innerText = isRegister ? 'Cadastrar' : 'Entrar';
-      fieldNome.classList.toggle('hidden', !isRegister);
-      document.getElementById('toggle-text').innerText = isRegister ? 'Já possui conta?' : 'Não tem uma conta?';
-      toggleAuth.innerText = isRegister ? 'Faça login' : 'Cadastre-se';
-      authError.classList.add('hidden');
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      authError.classList.add('hidden');
-
+      const nome = document.getElementById('nome').value;
       const email = document.getElementById('email').value;
       const senha = document.getElementById('senha').value;
-      const nome = document.getElementById('nome').value;
+      const msg = document.getElementById('msgErro');
 
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-      const body = isRegister ? { nome, email, senha } : { email, senha };
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const body = isLogin ? { email, senha } : { nome, email, senha };
 
       try {
         const res = await fetch(endpoint, {
@@ -69,13 +71,24 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro na autenticação.');
 
-        window.location.href = '/';
+        const data = await res.json();
+
+        if (res.ok) {
+          if (isLogin) {
+            window.location.href = 'index.html'; // Login ok, vai pro catálogo
+          } else {
+            msg.style.color = 'green';
+            msg.textContent = 'Cadastrado com sucesso! Faça login.';
+            setTimeout(() => toggleForm(), 1500); // Volta pra tela de login
+          }
+        } else {
+          msg.style.color = '#e50914';
+          msg.textContent = data.error || 'Erro inesperado.';
+        }
       } catch (err) {
-        authError.innerText = err.message;
-        authError.classList.remove('hidden');
+        msg.style.color = '#e50914';
+        msg.textContent = 'Erro de conexão com o servidor.';
       }
     });
   </script>

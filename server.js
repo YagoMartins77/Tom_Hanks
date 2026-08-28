@@ -17,7 +17,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"], /* <-- ESSA É A LINHA MÁGICA QUE LIBERA O ONCLICK */
+      scriptSrcAttr: ["'unsafe-inline'"], /* Libera o onclick no HTML */
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "https://image.tmdb.org", "data:"]
@@ -49,7 +49,7 @@ app.use(session({
   cookie: { httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Proteção 3: Bloqueio de Força Bruta (Máximo 20 tentativas a cada 15 min por IP)
+// Proteção 3: Bloqueio de Força Bruta
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -66,7 +66,6 @@ function authMiddleware(req, res, next) {
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { nome, email, senha } = req.body;
   try {
-    // Proteção 4: Criptografia forte de senha com salt 12
     const hash = await bcrypt.hash(senha, 12);
     await pool.query('INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)', [nome, email, hash]);
     res.status(201).json({ message: 'Registrado com sucesso!' });
@@ -81,7 +80,6 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
     if (rows.length === 0) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
-    // Compara a senha digitada com o Hash do banco
     const match = await bcrypt.compare(senha, rows[0].senha_hash);
     if (!match) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
@@ -92,8 +90,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+// AQUI É A ROTA DE LOGOUT QUE FOI CORRIGIDA
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => res.json({ message: 'Logout realizado.' }));
+  req.session.destroy(() => {
+    res.clearCookie('session_cookie'); // Destrói o rastro no navegador
+    res.json({ message: 'Logout realizado.' });
+  });
 });
 
 app.get('/api/auth/me', (req, res) => {
@@ -127,7 +129,6 @@ app.post('/api/favoritos', authMiddleware, async (req, res) => {
   }
 });
 
-// Proteção 5: IDOR - Só deleta se o favorito for do próprio usuário
 app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
   await pool.query('DELETE FROM favoritos WHERE usuario_id = ? AND tmdb_movie_id = ?', [req.session.usuario.id, req.params.id]);
   res.json({ message: 'Removido' });

@@ -33,20 +33,16 @@
   <!-- Cartão Expandido (Modal) -->
   <div id="filmeModal" class="modal hidden">
     <div class="modal-content">
-      <!-- Mudamos o X para um BUTTON real para garantir o clique -->
-
+      
       <div class="modal-body">
         <img id="modalPoster" src="" alt="Poster do Filme">
         <div class="modal-info">
           
-          <!-- Título, Estrela e Botão X lado a lado -->
-          <!-- Título, Estrela e Botão X lado a lado -->
           <div class="modal-header-top">
             <h2 id="modalTitulo"></h2>
             
             <div style="display: flex; gap: 20px; align-items: center;">
               <i id="modalEstrela" class="far fa-star estrela-btn-modal"></i>
-              <!-- Mudamos de span para button -->
               <button class="fechar-modal" onclick="fecharModal()" title="Fechar">&times;</button>
             </div>
           </div>
@@ -73,14 +69,15 @@
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
 
+    // AQUI É A FUNÇÃO QUE FOI ALTERADA (Adicionado o { cache: 'no-store' })
     async function iniciarCatalogo() {
       try {
-        const userRes = await fetch('/api/auth/me');
+        const userRes = await fetch('/api/auth/me', { cache: 'no-store' });
         if (!userRes.ok) return window.location.href = 'auth.html';
         const user = await userRes.json();
         document.getElementById('userName').textContent = `Olá, ${user.nome}`;
 
-        const favRes = await fetch('/api/favoritos');
+        const favRes = await fetch('/api/favoritos', { cache: 'no-store' });
         if (favRes.ok) {
           const favoritos = await favRes.json();
           favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
@@ -136,7 +133,6 @@
       
       const modalEstrela = document.getElementById('modalEstrela');
       
-      // NOVA LÓGICA: Amarramos a função de favoritar diretamente ao filme clicado
       modalEstrela.onclick = () => toggleFavoritoModal(filme.id, filme.title, filme.poster_path);
 
       if (favoritosIds.has(filme.id)) {
@@ -163,7 +159,6 @@
       }
     });
 
-    // Função de favoritar consertada
     async function toggleFavoritoModal(id, titulo, poster) {
       const modalEstrela = document.getElementById('modalEstrela');
       const isFav = favoritosIds.has(id);
@@ -202,7 +197,7 @@
       container.innerHTML = 'Carregando...';
       
       try {
-        const res = await fetch(`/api/comentarios/${movieId}`);
+        const res = await fetch(`/api/comentarios/${movieId}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Erro');
         
         const comentarios = await res.json();
