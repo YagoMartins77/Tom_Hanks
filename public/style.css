@@ -1,3 +1,6 @@
+/* =========================================
+   1. RESET E BASE
+   ========================================= */
 * {
   margin: 0;
   padding: 0;
@@ -10,7 +13,9 @@ body {
   color: #fff;
 }
 
-/* Header */
+/* =========================================
+   2. HEADER E BARRA DE PESQUISA
+   ========================================= */
 header {
   background-color: #000;
   padding: 20px;
@@ -58,7 +63,9 @@ h1 { color: #e50914; font-size: 1.5rem; }
 .user-menu { display: flex; align-items: center; gap: 15px; }
 .btn-sair { background-color: #e50914; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
 
-/* Grid de Filmes - O que coloca eles lado a lado */
+/* =========================================
+   3. GRID DE FILMES (CATÁLOGO)
+   ========================================= */
 .grid-filmes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -68,30 +75,25 @@ h1 { color: #e50914; font-size: 1.5rem; }
   margin: 0 auto;
 }
 
-/* Cartão do Filme - Comportando-se como botão */
 .filme-card {
   background-color: #222;
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer; /* Muda o mouse para uma mãozinha (botão) */
+  cursor: pointer;
   transition: transform 0.3s ease;
   position: relative;
 }
 
-.filme-card:hover {
-  transform: scale(1.05); /* Efeito de pular pra frente */
-}
+.filme-card:hover { transform: scale(1.05); }
 
-.poster-container img {
-  width: 100%;
-  display: block;
-}
-
+.poster-container img { width: 100%; display: block; }
 .card-info { padding: 15px; }
 .card-info h3 { font-size: 1rem; margin-bottom: 5px; }
 .card-info p { color: #aaa; font-size: 0.9rem; }
 
-/* Modal / Cartão Expandido */
+/* =========================================
+   4. MODAL / CARTÃO EXPANDIDO
+   ========================================= */
 .modal {
   position: fixed;
   top: 0;
@@ -118,45 +120,12 @@ h1 { color: #e50914; font-size: 1.5rem; }
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-.fechar-modal {
-  font-size: 3rem !important; /* Tamanho bem grande */
-  color: #aaa;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important; /* Força a luvinha do mouse */
-  line-height: 1;
-  padding: 0;
-  margin-top: -5px; /* Alinha visualmente com a estrela */
-  transition: color 0.2s, transform 0.2s;
-}
-
-.fechar-modal:hover {
-  color: #e50914; 
-  transform: scale(1.1);
-}
-
-.fechar-modal:hover {
-  color: #e50914; /* Fica vermelho ao passar o mouse */
-  transform: scale(1.1);
-}
-}
-
-.fechar-modal:hover {
-  color: white;
-}
-}
-
-.fechar-modal:hover { color: white; }
-
 .modal-body {
   display: flex;
   flex-direction: row;
 }
 
-.modal-body img {
-  width: 300px;
-  object-fit: cover;
-}
+.modal-body img { width: 300px; object-fit: cover; }
 
 .modal-info {
   padding: 30px;
@@ -167,43 +136,42 @@ h1 { color: #e50914; font-size: 1.5rem; }
   overflow-y: auto;
 }
 
-/* Estrela Lado a Lado com Título no Modal */
 .modal-header-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 15px;
-  padding-right: 30px;
+  padding-right: 10px;
 }
 
-.modal-info h2 {
-  font-size: 2rem;
+.modal-info h2 { font-size: 2rem; }
+
+/* Botão Fechar o Modal ("X") */
+.fechar-modal {
+  font-size: 3rem !important; 
+  color: #aaa;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important; 
+  line-height: 1;
+  padding: 0;
+  margin-top: -5px; 
+  transition: color 0.2s, transform 0.2s;
 }
+
+.fechar-modal:hover { color: #e50914; transform: scale(1.1); }
 
 /* Estrela no Modal */
-.estrela-btn-modal {
-  font-size: 2.2rem;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.estrela-btn-modal:hover {
-  transform: scale(1.2);
-}
-
-.fav-inactive {
-  color: #ffc107;
-  -webkit-text-stroke: 1px #ffc107;
-  color: transparent;
-}
-
+.estrela-btn-modal { font-size: 2.2rem; cursor: pointer; transition: transform 0.2s; }
+.estrela-btn-modal:hover { transform: scale(1.2); }
+.fav-inactive { color: #ffc107; -webkit-text-stroke: 1px #ffc107; color: transparent; }
 .fav-active { color: #ffc107; }
 
 .modal-info h3 { margin-top: 15px; margin-bottom: 5px; color: #e50914; }
 .modal-info p { color: #ccc; line-height: 1.5; }
 hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 
-/* Comentários dentro do Modal */
+/* Comentários */
 .comentarios-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 .comentario-item { background-color: #222; padding: 10px; border-radius: 5px; font-size: 0.9rem; }
 .comentario-item strong { color: #e50914; }
@@ -212,7 +180,9 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 .comentario-form input { flex-grow: 1; padding: 10px; border-radius: 4px; border: 1px solid #444; background: #333; color: white; }
 .comentario-form button { background-color: #e50914; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 
-/* Toast */
+/* =========================================
+   5. TOAST (MENSAGENS DE CONFIRMAÇÃO)
+   ========================================= */
 .toast {
   position: fixed;
   bottom: 30px;
@@ -232,6 +202,88 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 .toast.show { opacity: 1; bottom: 30px; }
 .toast.erro { background-color: #e50914; }
 
+/* =========================================
+   6. TELA DE LOGIN E CADASTRO (auth.html)
+   ========================================= */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #141414;
+}
+
+.auth-card {
+  background-color: #181818;
+  padding: 40px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+}
+
+.auth-card h2 {
+  margin-bottom: 25px;
+  color: #fff;
+  font-size: 2rem;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background-color: #333;
+  color: white;
+  font-size: 1rem;
+  outline: none;
+}
+
+.auth-card input:focus {
+  background-color: #444;
+  border-color: #e50914;
+}
+
+.auth-card button {
+  background-color: #e50914;
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 15px;
+  transition: background-color 0.2s;
+}
+
+.auth-card button:hover { background-color: #f40612; }
+
+.auth-card p {
+  margin-top: 20px;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.auth-card a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.auth-card a:hover { text-decoration: underline; }
+
+/* =========================================
+   7. RESPONSIVIDADE (CELULARES)
+   ========================================= */
 @media (max-width: 768px) {
   .modal-body { flex-direction: column; }
   .modal-body img { width: 100%; height: 250px; object-position: top; }
