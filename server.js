@@ -17,6 +17,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"], /* <-- ESSA É A LINHA MÁGICA QUE LIBERA O ONCLICK */
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "https://image.tmdb.org", "data:"]
