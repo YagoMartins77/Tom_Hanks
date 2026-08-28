@@ -34,18 +34,20 @@
   <div id="filmeModal" class="modal hidden">
     <div class="modal-content">
       <!-- Mudamos o X para um BUTTON real para garantir o clique -->
-       
+
       <div class="modal-body">
         <img id="modalPoster" src="" alt="Poster do Filme">
         <div class="modal-info">
           
+          <!-- Título, Estrela e Botão X lado a lado -->
           <!-- Título, Estrela e Botão X lado a lado -->
           <div class="modal-header-top">
             <h2 id="modalTitulo"></h2>
             
             <div style="display: flex; gap: 20px; align-items: center;">
               <i id="modalEstrela" class="far fa-star estrela-btn-modal"></i>
-              <span class="fechar-modal" onclick="fecharModal()" title="Fechar">&times;</span>
+              <!-- Mudamos de span para button -->
+              <button class="fechar-modal" onclick="fecharModal()" title="Fechar">&times;</button>
             </div>
           </div>
 
