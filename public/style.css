@@ -288,3 +288,17 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
   .modal-body { flex-direction: column; }
   .modal-body img { width: 100%; height: 250px; object-position: top; }
 }
+
+/* Botão Lixeira - Apagar Comentário */
+.btn-apagar-comentario {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: color 0.2s;
+}
+
+.btn-apagar-comentario:hover {
+  color: #e50914; /* Fica vermelho ao passar o mouse */
+}

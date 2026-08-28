@@ -30,7 +30,6 @@
     <div id="listaFilmes" class="grid-filmes"></div>
   </main>
 
-  <!-- Cartão Expandido (Modal) -->
   <div id="filmeModal" class="modal hidden">
     <div class="modal-content">
       
@@ -68,14 +67,15 @@
     let filmesGlobais = [];
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
+    let usuarioLogado = null; // Guardaremos os dados do usuário aqui
 
-    // AQUI É A FUNÇÃO QUE FOI ALTERADA (Adicionado o { cache: 'no-store' })
     async function iniciarCatalogo() {
       try {
         const userRes = await fetch('/api/auth/me', { cache: 'no-store' });
         if (!userRes.ok) return window.location.href = 'auth.html';
-        const user = await userRes.json();
-        document.getElementById('userName').textContent = `Olá, ${user.nome}`;
+        
+        usuarioLogado = await userRes.json();
+        document.getElementById('userName').textContent = `Olá, ${usuarioLogado.nome}`;
 
         const favRes = await fetch('/api/favoritos', { cache: 'no-store' });
         if (favRes.ok) {
@@ -175,11 +175,7 @@
           const res = await fetch('/api/favoritos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              tmdb_movie_id: id, 
-              titulo: titulo, 
-              poster_path: poster 
-            })
+            body: JSON.stringify({ tmdb_movie_id: id, titulo: titulo, poster_path: poster })
           });
           if (!res.ok) throw new Error('Erro ao favoritar');
 
@@ -188,7 +184,7 @@
           mostrarToast('Adicionado aos favoritos!');
         }
       } catch (err) {
-        mostrarToast('Erro ao favoritar. Recarregue a página.', 'erro');
+        mostrarToast('Erro ao favoritar.', 'erro');
       }
     }
 
@@ -211,7 +207,20 @@
         comentarios.forEach(c => {
           const div = document.createElement('div');
           div.className = 'comentario-item';
-          div.innerHTML = `<strong>${c.nome}:</strong> <span>${c.texto}</span>`;
+          
+          // Verifica se o comentário é do usuário logado para mostrar a lixeira
+          let lixeiraHtml = '';
+          if (usuarioLogado && c.usuario_id === usuarioLogado.id) {
+            lixeiraHtml = `<button class="btn-apagar-comentario" onclick="apagarComentario(${c.id})" title="Apagar meu comentário"><i class="fas fa-trash"></i></button>`;
+          }
+
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <strong>${c.nome}:</strong>
+              ${lixeiraHtml}
+            </div>
+            <span>${c.texto}</span>
+          `;
           container.appendChild(div);
         });
       } catch (err) {
@@ -236,6 +245,22 @@
         mostrarToast('Comentário publicado!');
       } catch (err) {
         mostrarToast('Erro ao publicar comentário', 'erro');
+      }
+    }
+
+    // NOVA FUNÇÃO: Apagar Comentário
+    async function apagarComentario(comentarioId) {
+      if (!confirm('Tem certeza que deseja apagar este comentário?')) return;
+
+      try {
+        const res = await fetch(`/api/comentarios/${comentarioId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Erro ao apagar');
+        
+        mostrarToast('Comentário apagado!');
+        // Recarrega a lista de comentários para sumir o que foi apagado
+        carregarComentarios(filmeAtualExpandido.id);
+      } catch (err) {
+        mostrarToast('Erro ao apagar o comentário', 'erro');
       }
     }
 

@@ -11,13 +11,12 @@ const mysql = require('mysql2/promise');
 
 const app = express();
 
-// Proteção 1: Ocultar cabeçalhos do Express e definir políticas de segurança
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"], /* Libera o onclick no HTML */
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "https://image.tmdb.org", "data:"]
@@ -38,7 +37,6 @@ const dbOptions = {
 };
 const pool = mysql.createPool(dbOptions);
 
-// Proteção 2: Sessão no Banco de Dados (Evita vazamento de memória e perda de login)
 const sessionStore = new MySQLStore({}, pool);
 app.use(session({
   key: 'session_cookie',
@@ -49,7 +47,6 @@ app.use(session({
   cookie: { httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Proteção 3: Bloqueio de Força Bruta
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -62,7 +59,6 @@ function authMiddleware(req, res, next) {
 }
 
 // --- ROTAS DE AUTENTICAÇÃO ---
-
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { nome, email, senha } = req.body;
   try {
@@ -90,10 +86,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-// AQUI É A ROTA DE LOGOUT QUE FOI CORRIGIDA
 app.post('/api/auth/logout', (req, res) => {
   req.session.destroy(() => {
-    res.clearCookie('session_cookie'); // Destrói o rastro no navegador
+    res.clearCookie('session_cookie');
     res.json({ message: 'Logout realizado.' });
   });
 });
@@ -134,14 +129,30 @@ app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
   res.json({ message: 'Removido' });
 });
 
+// AQUI: Atualizamos a busca para incluir o c.usuario_id
 app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
-  const [rows] = await pool.query(`SELECT c.id, c.texto, c.criado_em, u.nome FROM comentarios c JOIN usuarios u ON c.usuario_id = u.id WHERE c.tmdb_movie_id = ? ORDER BY c.criado_em DESC`, [req.params.id]);
+  const [rows] = await pool.query(`SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome FROM comentarios c JOIN usuarios u ON c.usuario_id = u.id WHERE c.tmdb_movie_id = ? ORDER BY c.criado_em DESC`, [req.params.id]);
   res.json(rows);
 });
 
 app.post('/api/comentarios', authMiddleware, async (req, res) => {
   await pool.query('INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto) VALUES (?, ?, ?)', [req.session.usuario.id, req.body.tmdb_movie_id, req.body.texto.trim()]);
   res.status(201).json({ message: 'Comentado' });
+});
+
+// NOVA ROTA: Apagar comentário (Protegido por IDOR)
+app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
+  try {
+    const [result] = await pool.query('DELETE FROM comentarios WHERE id = ? AND usuario_id = ?', [req.params.id, req.session.usuario.id]);
+    
+    // Se affectedRows for 0, significa que o comentário não é do usuário logado ou não existe
+    if (result.affectedRows === 0) {
+      return res.status(403).json({ error: 'Você só pode apagar os seus próprios comentários.' });
+    }
+    res.json({ message: 'Comentário apagado.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao apagar.' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
