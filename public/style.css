@@ -1,4 +1,3 @@
-/* Reset e Base */
 * {
   margin: 0;
   padding: 0;
@@ -11,7 +10,7 @@ body {
   color: #fff;
 }
 
-/* Header, Lupa e Logout */
+/* Header */
 header {
   background-color: #000;
   padding: 20px;
@@ -30,10 +29,7 @@ header {
   flex-wrap: wrap;
 }
 
-h1 {
-  color: #e50914;
-  font-size: 1.5rem;
-}
+h1 { color: #e50914; font-size: 1.5rem; }
 
 .search-container {
   position: relative;
@@ -59,22 +55,10 @@ h1 {
   color: #aaa;
 }
 
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+.user-menu { display: flex; align-items: center; gap: 15px; }
+.btn-sair { background-color: #e50914; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
 
-.btn-sair {
-  background-color: #e50914;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* Grid de Filmes */
+/* Grid de Filmes - O que coloca eles lado a lado */
 .grid-filmes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -84,68 +68,28 @@ h1 {
   margin: 0 auto;
 }
 
-/* Cartão do Filme */
+/* Cartão do Filme - Comportando-se como botão */
 .filme-card {
   background-color: #222;
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: pointer; /* Muda o mouse para uma mãozinha (botão) */
   transition: transform 0.3s ease;
   position: relative;
 }
 
 .filme-card:hover {
-  transform: scale(1.05);
+  transform: scale(1.05); /* Efeito de pular pra frente */
 }
 
-.poster-container {
-  position: relative;
-}
-
-.filme-card img {
+.poster-container img {
   width: 100%;
   display: block;
 }
 
-.card-info {
-  padding: 15px;
-}
-
-.card-info h3 {
-  font-size: 1rem;
-  margin-bottom: 5px;
-}
-
-.card-info p {
-  color: #aaa;
-  font-size: 0.9rem;
-}
-
-/* Estrela de Favorito (Canto superior direito) */
-.estrela-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 1.8rem;
-  cursor: pointer;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
-  transition: transform 0.2s;
-  z-index: 10;
-}
-
-.estrela-btn:hover {
-  transform: scale(1.2);
-}
-
-.fav-inactive {
-  color: #ffc107;
-  -webkit-text-stroke: 1px #ffc107; /* Contorno amarelo */
-  color: transparent; /* Meio transparente */
-}
-
-.fav-active {
-  color: #ffc107; /* Preenchida de amarelo */
-}
+.card-info { padding: 15px; }
+.card-info h3 { font-size: 1rem; margin-bottom: 5px; }
+.card-info p { color: #aaa; font-size: 0.9rem; }
 
 /* Modal / Cartão Expandido */
 .modal {
@@ -162,24 +106,16 @@ h1 {
   backdrop-filter: blur(5px);
 }
 
-.modal.hidden {
-  display: none;
-}
+.modal.hidden { display: none; }
 
 .modal-content {
   background-color: #181818;
   width: 90%;
-  max-width: 800px;
+  max-width: 850px;
   border-radius: 10px;
   position: relative;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  animation: fadeIn 0.3s;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 .fechar-modal {
@@ -192,9 +128,7 @@ h1 {
   z-index: 10;
 }
 
-.fechar-modal:hover {
-  color: white;
-}
+.fechar-modal:hover { color: white; }
 
 .modal-body {
   display: flex;
@@ -211,83 +145,56 @@ h1 {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  max-height: 450px;
+  max-height: 500px;
   overflow-y: auto;
+}
+
+/* Estrela Lado a Lado com Título no Modal */
+.modal-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding-right: 30px;
 }
 
 .modal-info h2 {
   font-size: 2rem;
-  margin-bottom: 15px;
-  padding-right: 30px; /* Espaço para o X */
 }
 
-.modal-info h3 {
-  margin-top: 15px;
-  margin-bottom: 5px;
-  color: #e50914;
+/* Estrela no Modal */
+.estrela-btn-modal {
+  font-size: 2.2rem;
+  cursor: pointer;
+  transition: transform 0.2s;
 }
 
-.modal-info p {
-  color: #ccc;
-  line-height: 1.5;
+.estrela-btn-modal:hover {
+  transform: scale(1.2);
 }
 
-hr {
-  border: 0;
-  height: 1px;
-  background: #333;
-  margin: 20px 0;
+.fav-inactive {
+  color: #ffc107;
+  -webkit-text-stroke: 1px #ffc107;
+  color: transparent;
 }
+
+.fav-active { color: #ffc107; }
+
+.modal-info h3 { margin-top: 15px; margin-bottom: 5px; color: #e50914; }
+.modal-info p { color: #ccc; line-height: 1.5; }
+hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 
 /* Comentários dentro do Modal */
-.comentarios-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-}
+.comentarios-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.comentario-item { background-color: #222; padding: 10px; border-radius: 5px; font-size: 0.9rem; }
+.comentario-item strong { color: #e50914; }
+.sem-comentarios { font-style: italic; color: #888; }
+.comentario-form { display: flex; gap: 10px; margin-top: auto; }
+.comentario-form input { flex-grow: 1; padding: 10px; border-radius: 4px; border: 1px solid #444; background: #333; color: white; }
+.comentario-form button { background-color: #e50914; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 
-.comentario-item {
-  background-color: #222;
-  padding: 10px;
-  border-radius: 5px;
-  font-size: 0.9rem;
-}
-
-.comentario-item strong {
-  color: #e50914;
-}
-
-.sem-comentarios {
-  font-style: italic;
-  color: #888;
-}
-
-.comentario-form {
-  display: flex;
-  gap: 10px;
-  margin-top: auto;
-}
-
-.comentario-form input {
-  flex-grow: 1;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid #444;
-  background: #333;
-  color: white;
-}
-
-.comentario-form button {
-  background-color: #e50914;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* Toast (Mensagem de Confirmação) */
+/* Toast */
 .toast {
   position: fixed;
   bottom: 30px;
@@ -303,29 +210,11 @@ hr {
   font-weight: bold;
 }
 
-.toast.hidden {
-  opacity: 0;
-  bottom: 10px;
-  pointer-events: none;
-}
+.toast.hidden { opacity: 0; bottom: 10px; pointer-events: none; }
+.toast.show { opacity: 1; bottom: 30px; }
+.toast.erro { background-color: #e50914; }
 
-.toast.show {
-  opacity: 1;
-  bottom: 30px;
-}
-
-.toast.erro {
-  background-color: #e50914;
-}
-
-/* Responsividade do Modal */
 @media (max-width: 768px) {
-  .modal-body {
-    flex-direction: column;
-  }
-  .modal-body img {
-    width: 100%;
-    height: 250px;
-    object-position: top;
-  }
+  .modal-body { flex-direction: column; }
+  .modal-body img { width: 100%; height: 250px; object-position: top; }
 }

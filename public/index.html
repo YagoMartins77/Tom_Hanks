@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Catálogo Tom Hanks</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Importando FontAwesome para as estrelas (favoritos) e lupa -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -13,7 +12,6 @@
     <div class="header-content">
       <h1>Catálogo Tom Hanks</h1>
       
-      <!-- Barra de Pesquisa -->
       <div class="search-container">
         <i class="fas fa-search lupa-icon"></i>
         <input type="text" id="searchInput" placeholder="Pesquisar filme..." onkeyup="pesquisarFilme()">
@@ -26,12 +24,11 @@
     </div>
   </header>
 
-  <!-- Mensagem de Confirmação (Toast) -->
   <div id="toastMensagem" class="toast hidden"></div>
 
   <main>
     <div id="listaFilmes" class="grid-filmes">
-      <!-- Os cartões dos filmes serão gerados aqui -->
+      <!-- Os cartões (botões) serão gerados aqui -->
     </div>
   </main>
 
@@ -43,7 +40,14 @@
       <div class="modal-body">
         <img id="modalPoster" src="" alt="Poster do Filme">
         <div class="modal-info">
-          <h2 id="modalTitulo"></h2>
+          
+          <!-- Título e Estrela lado a lado -->
+          <div class="modal-header-top">
+            <h2 id="modalTitulo"></h2>
+            <!-- A estrela agora fica aqui! -->
+            <i id="modalEstrela" class="far fa-star estrela-btn-modal" onclick="toggleFavoritoModal(event)"></i>
+          </div>
+
           <h3>Sinopse</h3>
           <p id="modalSinopse">Sinopse não disponível.</p>
           
@@ -66,21 +70,17 @@
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
 
-    // 1. Carregar Dados ao abrir a página
     async function iniciarCatalogo() {
       try {
-        // Busca os dados do usuário
         const userRes = await fetch('/api/auth/me');
         if (!userRes.ok) return window.location.href = 'auth.html';
         const user = await userRes.json();
         document.getElementById('userName').textContent = `Olá, ${user.nome}`;
 
-        // Busca os favoritos para saber quais estrelas preencher
         const favRes = await fetch('/api/favoritos');
         const favoritos = await favRes.json();
         favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
 
-        // Busca os filmes
         const filmesRes = await fetch('/api/filmes');
         filmesGlobais = await filmesRes.json();
         
@@ -90,29 +90,21 @@
       }
     }
 
-    // 2. Renderizar Filmes na Tela
     function renderizarFilmes(filmes) {
       const container = document.getElementById('listaFilmes');
       container.innerHTML = '';
 
       filmes.forEach(filme => {
-        if (!filme.poster_path) return; // Pula filmes sem imagem
-
-        const isFav = favoritosIds.has(filme.id);
-        const estrelaClass = isFav ? 'fas fa-star fav-active' : 'far fa-star fav-inactive';
+        if (!filme.poster_path) return;
 
         const cartao = document.createElement('div');
         cartao.className = 'filme-card';
-        // O clique no cartão abre o modal, exceto se clicar na estrela
-        cartao.onclick = () => abrirModal(filme);
+        cartao.onclick = () => abrirModal(filme); // O cartão inteiro é um botão
 
+        // O cartão agora só tem a foto e o nome, sem estrela
         cartao.innerHTML = `
           <div class="poster-container">
             <img src="https://image.tmdb.org/t/p/w500${filme.poster_path}" alt="${filme.title}">
-            <!-- Estrela de Favorito -->
-            <i class="${estrelaClass} estrela-btn" 
-               onclick="toggleFavorito(event, ${filme.id}, '${filme.title.replace(/'/g, "\\'")}', '${filme.poster_path}')">
-            </i>
           </div>
           <div class="card-info">
             <h3>${filme.title}</h3>
@@ -123,7 +115,6 @@
       });
     }
 
-    // 3. Barra de Pesquisa (Lupa)
     function pesquisarFilme() {
       const termo = document.getElementById('searchInput').value.toLowerCase();
       const filmesFiltrados = filmesGlobais.filter(filme => 
@@ -132,39 +123,19 @@
       renderizarFilmes(filmesFiltrados);
     }
 
-    // 4. Lógica da Estrela (Favoritar/Desfavoritar)
-    async function toggleFavorito(event, id, titulo, poster) {
-      event.stopPropagation(); // Impede que o clique na estrela abra o modal
-      const icone = event.target;
-      const isFav = favoritosIds.has(id);
-
-      try {
-        if (isFav) {
-          await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
-          favoritosIds.delete(id);
-          icone.className = 'far fa-star fav-inactive estrela-btn';
-          mostrarToast('Removido dos favoritos!');
-        } else {
-          await fetch('/api/favoritos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tmdb_movie_id: id, titulo, poster_path: poster })
-          });
-          favoritosIds.add(id);
-          icone.className = 'fas fa-star fav-active estrela-btn';
-          mostrarToast('Adicionado aos favoritos!');
-        }
-      } catch (err) {
-        mostrarToast('Erro ao favoritar', 'erro');
-      }
-    }
-
-    // 5. Cartão Expandido (Modal) e Comentários
     function abrirModal(filme) {
       filmeAtualExpandido = filme;
       document.getElementById('modalTitulo').textContent = filme.title;
       document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível em português.';
       document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
+      
+      // Verifica se é favorito e pinta a estrela de dentro do modal
+      const modalEstrela = document.getElementById('modalEstrela');
+      if (favoritosIds.has(filme.id)) {
+        modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
+      } else {
+        modalEstrela.className = 'far fa-star fav-inactive estrela-btn-modal';
+      }
       
       document.getElementById('filmeModal').classList.remove('hidden');
       document.getElementById('novoComentario').value = '';
@@ -175,6 +146,39 @@
     function fecharModal() {
       document.getElementById('filmeModal').classList.add('hidden');
       filmeAtualExpandido = null;
+    }
+
+    // Função de favoritar acionada pelo ícone dentro do modal
+    async function toggleFavoritoModal(event) {
+      if (!filmeAtualExpandido) return;
+      
+      const id = filmeAtualExpandido.id;
+      const icone = event.target;
+      const isFav = favoritosIds.has(id);
+
+      try {
+        if (isFav) {
+          await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
+          favoritosIds.delete(id);
+          icone.className = 'far fa-star fav-inactive estrela-btn-modal';
+          mostrarToast('Removido dos favoritos!');
+        } else {
+          await fetch('/api/favoritos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              tmdb_movie_id: id, 
+              titulo: filmeAtualExpandido.title, 
+              poster_path: filmeAtualExpandido.poster_path 
+            })
+          });
+          favoritosIds.add(id);
+          icone.className = 'fas fa-star fav-active estrela-btn-modal';
+          mostrarToast('Adicionado aos favoritos!');
+        }
+      } catch (err) {
+        mostrarToast('Erro ao favoritar', 'erro');
+      }
     }
 
     async function carregarComentarios(movieId) {
@@ -212,14 +216,13 @@
       mostrarToast('Comentário publicado!');
     }
 
-    // 6. Mensagem de Confirmação (Toast)
     function mostrarToast(mensagem, tipo = 'sucesso') {
       const toast = document.getElementById('toastMensagem');
       toast.textContent = mensagem;
       toast.className = `toast show ${tipo}`;
       setTimeout(() => {
         toast.className = 'toast hidden';
-      }, 3000); // Some após 3 segundos
+      }, 3000);
     }
 
     async function fazerLogout() {
@@ -227,7 +230,6 @@
       window.location.href = 'auth.html';
     }
 
-    // Iniciar
     iniciarCatalogo();
   </script>
 </body>
