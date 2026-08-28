@@ -24,28 +24,26 @@
     </div>
   </header>
 
-  <!-- Mensagem de Confirmação (Toast) -->
   <div id="toastMensagem" class="toast hidden"></div>
 
   <main>
-    <div id="listaFilmes" class="grid-filmes">
-      <!-- Os cartões (botões) serão gerados aqui -->
-    </div>
+    <div id="listaFilmes" class="grid-filmes"></div>
   </main>
 
   <!-- Cartão Expandido (Modal) -->
   <div id="filmeModal" class="modal hidden">
     <div class="modal-content">
-      <span class="fechar-modal" onclick="fecharModal()">&times;</span>
+      <!-- Mudamos o X para um BUTTON real para garantir o clique -->
+      <button class="fechar-modal" onclick="fecharModal()" title="Fechar">&times;</button>
       
       <div class="modal-body">
         <img id="modalPoster" src="" alt="Poster do Filme">
         <div class="modal-info">
           
-          <!-- Título e Estrela lado a lado -->
           <div class="modal-header-top">
             <h2 id="modalTitulo"></h2>
-            <i id="modalEstrela" class="far fa-star estrela-btn-modal" onclick="toggleFavoritoModal()"></i>
+            <!-- O onclick da estrela agora é aplicado via JavaScript -->
+            <i id="modalEstrela" class="far fa-star estrela-btn-modal"></i>
           </div>
 
           <h3>Sinopse</h3>
@@ -70,7 +68,6 @@
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
 
-    // Inicia a tela
     async function iniciarCatalogo() {
       try {
         const userRes = await fetch('/api/auth/me');
@@ -94,7 +91,6 @@
       }
     }
 
-    // Renderiza os filmes
     function renderizarFilmes(filmes) {
       const container = document.getElementById('listaFilmes');
       container.innerHTML = '';
@@ -104,7 +100,7 @@
 
         const cartao = document.createElement('div');
         cartao.className = 'filme-card';
-        cartao.onclick = () => abrirModal(filme); // O cartão todo é clicável
+        cartao.onclick = () => abrirModal(filme);
 
         cartao.innerHTML = `
           <div class="poster-container">
@@ -119,7 +115,6 @@
       });
     }
 
-    // Lupa de pesquisa
     function pesquisarFilme() {
       const termo = document.getElementById('searchInput').value.toLowerCase();
       const filmesFiltrados = filmesGlobais.filter(filme => 
@@ -128,7 +123,6 @@
       renderizarFilmes(filmesFiltrados);
     }
 
-    // Abrir o Modal
     function abrirModal(filme) {
       filmeAtualExpandido = filme;
       document.getElementById('modalTitulo').textContent = filme.title;
@@ -136,6 +130,10 @@
       document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
       
       const modalEstrela = document.getElementById('modalEstrela');
+      
+      // NOVA LÓGICA: Amarramos a função de favoritar diretamente ao filme clicado
+      modalEstrela.onclick = () => toggleFavoritoModal(filme.id, filme.title, filme.poster_path);
+
       if (favoritosIds.has(filme.id)) {
         modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
       } else {
@@ -148,13 +146,11 @@
       carregarComentarios(filme.id);
     }
 
-    // Fechar o Modal
     function fecharModal() {
       document.getElementById('filmeModal').classList.add('hidden');
       filmeAtualExpandido = null;
     }
 
-    // Fechar Modal clicando no fundo escuro
     window.addEventListener('click', function(event) {
       const modal = document.getElementById('filmeModal');
       if (event.target === modal) {
@@ -162,11 +158,8 @@
       }
     });
 
-    // Lógica da Estrela (Favoritos) blindada contra erros
-    async function toggleFavoritoModal() {
-      if (!filmeAtualExpandido) return;
-      
-      const id = filmeAtualExpandido.id;
+    // Função de favoritar consertada
+    async function toggleFavoritoModal(id, titulo, poster) {
       const modalEstrela = document.getElementById('modalEstrela');
       const isFav = favoritosIds.has(id);
 
@@ -184,8 +177,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               tmdb_movie_id: id, 
-              titulo: filmeAtualExpandido.title, 
-              poster_path: filmeAtualExpandido.poster_path 
+              titulo: titulo, 
+              poster_path: poster 
             })
           });
           if (!res.ok) throw new Error('Erro ao favoritar');
@@ -195,18 +188,17 @@
           mostrarToast('Adicionado aos favoritos!');
         }
       } catch (err) {
-        mostrarToast('Erro ao atualizar favorito', 'erro');
+        mostrarToast('Erro ao favoritar. Recarregue a página.', 'erro');
       }
     }
 
-    // Carregar comentários
     async function carregarComentarios(movieId) {
       const container = document.getElementById('listaComentarios');
       container.innerHTML = 'Carregando...';
       
       try {
         const res = await fetch(`/api/comentarios/${movieId}`);
-        if (!res.ok) throw new Error('Erro ao buscar');
+        if (!res.ok) throw new Error('Erro');
         
         const comentarios = await res.json();
         
@@ -227,7 +219,6 @@
       }
     }
 
-    // Adicionar comentário
     async function adicionarComentario() {
       const texto = document.getElementById('novoComentario').value;
       if (!texto.trim() || !filmeAtualExpandido) return;
@@ -238,8 +229,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tmdb_movie_id: filmeAtualExpandido.id, texto })
         });
-
-        if (!res.ok) throw new Error('Falha ao postar');
+        if (!res.ok) throw new Error('Erro');
 
         document.getElementById('novoComentario').value = '';
         carregarComentarios(filmeAtualExpandido.id);
@@ -249,7 +239,6 @@
       }
     }
 
-    // Toast
     function mostrarToast(mensagem, tipo = 'sucesso') {
       const toast = document.getElementById('toastMensagem');
       toast.textContent = mensagem;
@@ -259,7 +248,6 @@
       }, 3000);
     }
 
-    // Logout
     async function fazerLogout() {
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = 'auth.html';
