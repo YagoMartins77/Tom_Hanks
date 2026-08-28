@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autenticação - Catálogo Tom Hanks</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <h2 id="formTitle">Entrar</h2>
+    
+    <form id="authForm">
+      <input type="text" id="nome" placeholder="Seu Nome" style="display: none;">
+      <input type="email" id="email" placeholder="E-mail" required>
+      <input type="password" id="senha" placeholder="Senha" required>
+      <button type="submit" id="submitBtn">Entrar</button>
+    </form>
+    
+    <p id="toggleText">
+      Não tem uma conta? <a onclick="setMode('cadastro')">Cadastre-se</a>
+    </p>
+    <p id="forgotText">
+      <a onclick="setMode('esqueci')">Esqueci minha senha</a>
+    </p>
+    
+    <p id="msgErro" style="margin-top: 15px; font-weight: bold; text-align: center;"></p>
+  </div>
+
+  <script>
+    let currentMode = 'login'; // login, cadastro, esqueci
+
+    function setMode(mode) {
+      currentMode = mode;
+      const nomeInput = document.getElementById('nome');
+      const senhaInput = document.getElementById('senha');
+      const title = document.getElementById('formTitle');
+      const btn = document.getElementById('submitBtn');
+      const toggle = document.getElementById('toggleText');
+      const forgot = document.getElementById('forgotText');
+      const msg = document.getElementById('msgErro');
+      msg.textContent = '';
+
+      if (mode === 'login') {
+        nomeInput.style.display = 'none';
+        nomeInput.required = false;
+        senhaInput.style.display = 'block';
+        senhaInput.required = true;
+        title.textContent = 'Entrar';
+        btn.textContent = 'Entrar';
+        toggle.innerHTML = 'Não tem uma conta? <a onclick="setMode(\'cadastro\')">Cadastre-se</a>';
+        forgot.style.display = 'block';
+      } else if (mode === 'cadastro') {
+        nomeInput.style.display = 'block';
+        nomeInput.required = true;
+        senhaInput.style.display = 'block';
+        senhaInput.required = true;
+        title.textContent = 'Cadastrar';
+        btn.textContent = 'Cadastrar';
+        toggle.innerHTML = 'Já tem uma conta? <a onclick="setMode(\'login\')">Faça Login</a>';
+        forgot.style.display = 'none';
+      } else if (mode === 'esqueci') {
+        nomeInput.style.display = 'none';
+        nomeInput.required = false;
+        senhaInput.style.display = 'none';
+        senhaInput.required = false;
+        title.textContent = 'Recuperar Senha';
+        btn.textContent = 'Enviar Link por E-mail';
+        toggle.innerHTML = 'Lembrou a senha? <a onclick="setMode(\'login\')">Voltar ao Login</a>';
+        forgot.style.display = 'none';
+      }
+    }
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById('nome').value;
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const msg = document.getElementById('msgErro');
+
+      let endpoint = '/api/auth/login';
+      let body = { email, senha };
+
+      if (currentMode === 'cadastro') {
+        endpoint = '/api/auth/register';
+        body = { nome, email, senha };
+      } else if (currentMode === 'esqueci') {
+        endpoint = '/api/auth/forgot-password';
+        body = { email };
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          if (currentMode === 'login') {
+            window.location.href = 'index.html';
+          } else if (currentMode === 'cadastro') {
+            msg.style.color = 'green';
+            msg.textContent = 'Cadastrado com sucesso!';
+            setTimeout(() => setMode('login'), 1500);
+          } else {
+            msg.style.color = 'green';
+            msg.textContent = data.message || 'Verifique seu e-mail no Mailtrap.';
+          }
+        } else {
+          msg.style.color = '#e50914';
+          msg.textContent = data.error || 'Erro na requisição.';
+        }
+      } catch (err) {
+        msg.style.color = '#e50914';
+        msg.textContent = 'Erro de conexão com o servidor.';
+      }
+    });
+  </script>
+</body>
+</html>

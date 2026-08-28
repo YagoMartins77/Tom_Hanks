@@ -4,7 +4,6 @@ const session = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const bcrypt = require('bcrypt');
 const path = require('path');
 const axios = require('axios');
 const mysql = require('mysql2/promise');
@@ -28,14 +27,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const dbOptions = {
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: Number(process.env.DB_PORT) || 3306
-};
-const pool = mysql.createPool(dbOptions);
+});
 
 const sessionStore = new MySQLStore({}, pool);
 app.use(session({
@@ -53,36 +51,30 @@ const authLimiter = rateLimit({
   message: { error: 'Muitas tentativas. Tente novamente mais tarde.' }
 });
 
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3001';
+
 function authMiddleware(req, res, next) {
   if (!req.session.usuario) return res.status(401).json({ error: 'Faça login.' });
   next();
 }
 
-// --- ROTAS DE AUTENTICAÇÃO ---
+// --- ROTAS REPASSADAS AO AUTH-SERVICE VIA REDE INTERNA ---
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { nome, email, senha } = req.body;
   try {
-    const hash = await bcrypt.hash(senha, 12);
-    await pool.query('INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)', [nome, email, hash]);
-    res.status(201).json({ message: 'Registrado com sucesso!' });
+    const response = await axios.post(`${AUTH_SERVICE_URL}/register`, req.body);
+    res.status(response.status).json(response.data);
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao registrar.' });
+    res.status(err.response?.status || 500).json(err.response?.data || { error: 'Erro no serviço de autenticação' });
   }
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
-  const { email, senha } = req.body;
   try {
-    const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-    if (rows.length === 0) return res.status(401).json({ error: 'Credenciais inválidas.' });
-
-    const match = await bcrypt.compare(senha, rows[0].senha_hash);
-    if (!match) return res.status(401).json({ error: 'Credenciais inválidas.' });
-
-    req.session.usuario = { id: rows[0].id, nome: rows[0].nome, email: rows[0].email };
-    res.json(req.session.usuario);
+    const response = await axios.post(`${AUTH_SERVICE_URL}/login`, req.body);
+    req.session.usuario = response.data;
+    res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: 'Erro no login.' });
+    res.status(err.response?.status || 500).json(err.response?.data || { error: 'Credenciais inválidas.' });
   }
 });
 
@@ -98,17 +90,41 @@ app.get('/api/auth/me', (req, res) => {
   res.json(req.session.usuario);
 });
 
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const response = await axios.post(`${AUTH_SERVICE_URL}/forgot-password`, {
+      email: req.body.email,
+      baseUrl
+    });
+    res.json(response.data);
+  } catch (err) {
+    res.status(err.response?.status || 500).json(err.response?.data || { error: 'Erro ao solicitar recuperação.' });
+  }
+});
+
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  try {
+    const response = await axios.post(`${AUTH_SERVICE_URL}/reset-password`, req.body);
+    res.json(response.data);
+  } catch (err) {
+    res.status(err.response?.status || 500).json(err.response?.data || { error: 'Erro ao redefinir senha.' });
+  }
+});
+
 // --- ROTAS DO CATÁLOGO TMDB ---
 app.get('/api/filmes', authMiddleware, async (req, res) => {
   try {
-    const response = await axios.get(`https://api.themoviedb.org/3/person/31/movie_credits?api_key=${process.env.TMDB_API_KEY}&language=pt-BR`);
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/person/31/movie_credits?api_key=${process.env.TMDB_API_KEY}&language=pt-BR`
+    );
     res.json(response.data.cast || []);
   } catch (err) {
     res.status(500).json({ error: 'Erro TMDB.' });
   }
 });
 
-// --- FAVORITOS & COMENTÁRIOS ---
+// --- FAVORITOS & COMENTÁRIOS ISOLADOS ---
 app.get('/api/favoritos', authMiddleware, async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM favoritos WHERE usuario_id = ?', [req.session.usuario.id]);
   res.json(rows);
@@ -117,7 +133,10 @@ app.get('/api/favoritos', authMiddleware, async (req, res) => {
 app.post('/api/favoritos', authMiddleware, async (req, res) => {
   const { tmdb_movie_id, titulo, poster_path } = req.body;
   try {
-    await pool.query('INSERT INTO favoritos (usuario_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)', [req.session.usuario.id, tmdb_movie_id, titulo, poster_path]);
+    await pool.query(
+      'INSERT INTO favoritos (usuario_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
+      [req.session.usuario.id, tmdb_movie_id, titulo, poster_path]
+    );
     res.status(201).json({ message: 'Favoritado' });
   } catch (err) {
     res.status(400).json({ error: 'Já favoritado' });
@@ -129,43 +148,35 @@ app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
   res.json({ message: 'Removido' });
 });
 
-// AQUI: Atualizamos a busca para incluir o c.usuario_id
-// ROTA MODIFICADA: Traz apenas os comentários do próprio usuário logado
 app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      `SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome 
-       FROM comentarios c 
-       JOIN usuarios u ON c.usuario_id = u.id 
-       WHERE c.tmdb_movie_id = ? AND c.usuario_id = ? 
-       ORDER BY c.criado_em DESC`, 
-      [req.params.id, req.session.usuario.id] // <-- Adicionamos a trava do ID do usuário aqui
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao carregar comentários.' });
-  }
+  const [rows] = await pool.query(
+    `SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome 
+     FROM comentarios c 
+     JOIN usuarios u ON c.usuario_id = u.id 
+     WHERE c.tmdb_movie_id = ? AND c.usuario_id = ? 
+     ORDER BY c.criado_em DESC`,
+    [req.params.id, req.session.usuario.id]
+  );
+  res.json(rows);
 });
 
 app.post('/api/comentarios', authMiddleware, async (req, res) => {
-  await pool.query('INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto) VALUES (?, ?, ?)', [req.session.usuario.id, req.body.tmdb_movie_id, req.body.texto.trim()]);
+  await pool.query(
+    'INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto) VALUES (?, ?, ?)',
+    [req.session.usuario.id, req.body.tmdb_movie_id, req.body.texto.trim()]
+  );
   res.status(201).json({ message: 'Comentado' });
 });
 
-// NOVA ROTA: Apagar comentário (Protegido por IDOR)
 app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM comentarios WHERE id = ? AND usuario_id = ?', [req.params.id, req.session.usuario.id]);
-    
-    // Se affectedRows for 0, significa que o comentário não é do usuário logado ou não existe
-    if (result.affectedRows === 0) {
-      return res.status(403).json({ error: 'Você só pode apagar os seus próprios comentários.' });
-    }
-    res.json({ message: 'Comentário apagado.' });
+    if (result.affectedRows === 0) return res.status(403).json({ error: 'Não autorizado.' });
+    res.json({ message: 'Apagado' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao apagar.' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Catálogo seguro rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Catálogo rodando na porta ${PORT}`));

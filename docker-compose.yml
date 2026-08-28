@@ -1,14 +1,19 @@
 version: '3.8'
 
+networks:
+  app-network:
+    driver: bridge
+
 services:
-  app:
-    build: .
+  catalogo-service:
+    build: ./catalogo-service
     container_name: catalogo-tom-hanks
     restart: always
     ports:
       - "8228:3000"
     environment:
       - PORT=3000
+      - AUTH_SERVICE_URL=http://auth-service:3001
       - TMDB_API_KEY=${TMDB_API_KEY}
       - DB_HOST=35.226.64.52
       - DB_USER=IAC_2026_02_yago_martins
@@ -16,3 +21,25 @@ services:
       - DB_NAME=IAC_2026_02_yago_martins
       - DB_PORT=3306
       - SESSION_SECRET=${SESSION_SECRET}
+    networks:
+      - app-network
+    depends_on:
+      - auth-service
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    restart: always
+    environment:
+      - PORT=3001
+      - DB_HOST=35.226.64.52
+      - DB_USER=IAC_2026_02_yago_martins
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=IAC_2026_02_yago_martins
+      - DB_PORT=3306
+      - SMTP_HOST=sandbox.smtp.mailtrap.io
+      - SMTP_PORT=2525
+      - SMTP_USER=${MAILTRAP_USER}
+      - SMTP_PASS=${MAILTRAP_PASS}
+    networks:
+      - app-network
