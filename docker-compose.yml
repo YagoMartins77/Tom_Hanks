@@ -6,10 +6,11 @@ networks:
     ipam:
       config:
         - subnet: 10.99.0.0/16
+
 services:
   catalogo-service:
     build: ./catalogo-service
-    container_name: catalogo-tom-hanks
+    container_name: catalogo-tom-hanks-yago # Nome único
     restart: always
     ports:
       - "8228:3000"
@@ -30,7 +31,7 @@ services:
 
   auth-service:
     build: ./auth-service
-    container_name: auth-service
+    container_name: auth-service-yago # Nome único
     restart: always
     environment:
       - PORT=3001
