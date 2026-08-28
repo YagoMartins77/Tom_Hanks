@@ -29,11 +29,14 @@ const transporter = nodemailer.createTransport({
 
 // Cadastro
 app.post('/register', async (req, res) => {
-  const { nome, email, senha, role } = req.body;
+  // 1. Removemos o 'role' do destructuring. O backend não aceita mais palpites!
+  const { nome, email, senha } = req.body;
   if (!nome || !email || !senha) return res.status(400).json({ error: 'Campos obrigatórios ausentes.' });
 
   try {
-    const userRole = role === 'admin' ? 'admin' : 'usuario';
+    // 2. Forçamos a regra de negócio com segurança máxima:
+    const userRole = 'usuario'; 
+    
     const hash = await bcrypt.hash(senha, 12);
     const [result] = await pool.query(
       'INSERT INTO usuarios (nome, email, senha_hash, role) VALUES (?, ?, ?, ?)',
