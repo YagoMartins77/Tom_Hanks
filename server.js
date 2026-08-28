@@ -130,9 +130,21 @@ app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
 });
 
 // AQUI: Atualizamos a busca para incluir o c.usuario_id
+// ROTA MODIFICADA: Traz apenas os comentários do próprio usuário logado
 app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
-  const [rows] = await pool.query(`SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome FROM comentarios c JOIN usuarios u ON c.usuario_id = u.id WHERE c.tmdb_movie_id = ? ORDER BY c.criado_em DESC`, [req.params.id]);
-  res.json(rows);
+  try {
+    const [rows] = await pool.query(
+      `SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome 
+       FROM comentarios c 
+       JOIN usuarios u ON c.usuario_id = u.id 
+       WHERE c.tmdb_movie_id = ? AND c.usuario_id = ? 
+       ORDER BY c.criado_em DESC`, 
+      [req.params.id, req.session.usuario.id] // <-- Adicionamos a trava do ID do usuário aqui
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao carregar comentários.' });
+  }
 });
 
 app.post('/api/comentarios', authMiddleware, async (req, res) => {
