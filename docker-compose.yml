@@ -10,13 +10,13 @@ networks:
 services:
   catalogo-service:
     build: ./catalogo-service
-    container_name: catalogo-tom-hanks-yago # Nome único
+    container_name: catalogo-tom-hanks-yago
     restart: always
     ports:
       - "8228:3000"
     environment:
       - PORT=3000
-      - AUTH_SERVICE_URL=http://auth-service:3001
+      - AUTH_SERVICE_URL=http://auth-service-yago:3001
       - TMDB_API_KEY=${TMDB_API_KEY}
       - DB_HOST=35.226.64.52
       - DB_USER=IAC_2026_02_yago_martins
@@ -31,17 +31,16 @@ services:
 
   auth-service:
     build: ./auth-service
-    image: auth-yago-v2
     container_name: auth-service-yago
     restart: always
     environment:
-      - DB_HOST=${DB_HOST}
-      - DB_USER=${DB_USER}
+      - DB_HOST=35.226.64.52
+      - DB_USER=IAC_2026_02_yago_martins
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_PORT=${DB_PORT}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
+      - DB_NAME=IAC_2026_02_yago_martins
+      - DB_PORT=3306
+      - SMTP_HOST=smtp-relay.brevo.com
+      - SMTP_PORT=587
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
     networks:
