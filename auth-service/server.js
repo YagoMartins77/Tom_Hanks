@@ -19,8 +19,8 @@ const pool = mysql.createPool({
 });
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io',
-  port: Number(process.env.SMTP_PORT) || 2525,
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -90,8 +90,8 @@ app.post('/forgot-password', async (req, res) => {
 
     const resetLink = `${baseUrl}/reset-password.html?token=${token}`;
 
-    await transporter.sendMail({
-      from: '"Catálogo Tom Hanks" <no-reply@tomhanks.dev>',
+   await transporter.sendMail({
+      from: '"Catálogo Tom Hanks" <yagofelipeoliveira3@gmail.com>', 
       to: email,
       subject: 'Recuperação de Senha',
       html: `
