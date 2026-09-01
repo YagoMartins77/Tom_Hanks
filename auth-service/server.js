@@ -19,24 +19,24 @@ const pool = mysql.createPool({
 });
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
+  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: false, // Brevo na porta 587 usa STARTTLS
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   }
 });
 
-// Cadastro
+// Cadastro (Blindado contra Mass Assignment)
 app.post('/register', async (req, res) => {
-  // 1. Removemos o 'role' do destructuring. O backend não aceita mais palpites!
   const { nome, email, senha } = req.body;
-  if (!nome || !email || !senha) return res.status(400).json({ error: 'Campos obrigatórios ausentes.' });
+  if (!nome || !email || !senha) {
+    return res.status(400).json({ error: 'Campos obrigatórios ausentes.' });
+  }
 
   try {
-    // 2. Forçamos a regra de negócio com segurança máxima:
-    const userRole = 'usuario'; 
-    
+    const userRole = 'usuario';
     const hash = await bcrypt.hash(senha, 12);
     const [result] = await pool.query(
       'INSERT INTO usuarios (nome, email, senha_hash, role) VALUES (?, ?, ?, ?)',
@@ -44,6 +44,7 @@ app.post('/register', async (req, res) => {
     );
     res.status(201).json({ id: result.insertId, nome, email, role: userRole });
   } catch (err) {
+    console.error('Erro no register:', err);
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'E-mail já cadastrado.' });
     res.status(500).json({ error: 'Erro ao registrar.' });
   }
@@ -52,7 +53,9 @@ app.post('/register', async (req, res) => {
 // Login
 app.post('/login', async (req, res) => {
   const { email, senha } = req.body;
-  if (!email || !senha) return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+  }
 
   try {
     const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
@@ -64,11 +67,12 @@ app.post('/login', async (req, res) => {
 
     res.json({ id: user.id, nome: user.nome, email: user.email, role: user.role });
   } catch (err) {
+    console.error('Erro no login:', err);
     res.status(500).json({ error: 'Erro no login.' });
   }
 });
 
-// Solicitar Recuperação de Senha (Mailtrap)
+// Solicitar Recuperação de Senha (Brevo)
 app.post('/forgot-password', async (req, res) => {
   const { email, baseUrl } = req.body;
   if (!email) return res.status(400).json({ error: 'Informe o e-mail.' });
@@ -88,17 +92,18 @@ app.post('/forgot-password', async (req, res) => {
       [token, user.id, expiraEm]
     );
 
-    const resetLink = `${baseUrl}/reset-password.html?token=${token}`;
+    const appUrl = baseUrl || process.env.APP_URL || 'https://yago-martins-isw055.lapps.studio';
+    const resetLink = `${appUrl}/reset-password.html?token=${token}`;
 
-   await transporter.sendMail({
-      from: '"Catálogo Tom Hanks" <yagofelipeoliveira3@gmail.com>', 
+    await transporter.sendMail({
+      from: '"Catálogo Tom Hanks" <yagofelipeoliveira3@gmail.com>',
       to: email,
       subject: 'Recuperação de Senha',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
           <h2>Redefinição de Senha</h2>
           <p>Olá, <strong>${user.nome}</strong>!</p>
-          <p>Você solicitou a recuperação da sua senha.</p>
+          <p>Você solicitou a recuperação da sua senha no Catálogo Tom Hanks.</p>
           <p><a href="${resetLink}" style="background-color: #e50914; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Redefinir Minha Senha</a></p>
           <p>Este link expira em <strong>30 minutos</strong> e só pode ser usado uma vez.</p>
         </div>
@@ -107,6 +112,7 @@ app.post('/forgot-password', async (req, res) => {
 
     res.json({ message: 'Se o e-mail existir, o link de recuperação foi enviado.' });
   } catch (err) {
+    console.error('ERRO DETALHADO NO FORGOT-PASSWORD:', err);
     res.status(500).json({ error: 'Erro ao processar recuperação.' });
   }
 });
@@ -115,7 +121,7 @@ app.post('/forgot-password', async (req, res) => {
 app.post('/reset-password', async (req, res) => {
   const { token, novaSenha } = req.body;
   if (!token || !novaSenha || novaSenha.length < 6) {
-    return res.status(400).json({ error: 'Token inválido ou senha muito curta.' });
+    return res.status(400).json({ error: 'Token inválido ou senha com menos de 6 caracteres.' });
   }
 
   try {
@@ -136,6 +142,7 @@ app.post('/reset-password', async (req, res) => {
 
     res.json({ message: 'Senha atualizada com sucesso!' });
   } catch (err) {
+    console.error('Erro no reset-password:', err);
     res.status(500).json({ error: 'Erro ao atualizar senha.' });
   }
 });
