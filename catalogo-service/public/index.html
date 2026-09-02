@@ -67,7 +67,7 @@
     let filmesGlobais = [];
     let favoritosIds = new Set();
     let filmeAtualExpandido = null;
-    let usuarioLogado = null; // Guardaremos os dados do usuário aqui
+    let usuarioLogado = null; 
 
     async function iniciarCatalogo() {
       try {
@@ -208,19 +208,27 @@
           const div = document.createElement('div');
           div.className = 'comentario-item';
           
-          // Verifica se o comentário é do usuário logado para mostrar a lixeira
+          // Verifica se é o dono do comentário OU se é admin
           let lixeiraHtml = '';
-          if (usuarioLogado && c.usuario_id === usuarioLogado.id) {
-            lixeiraHtml = `<button class="btn-apagar-comentario" onclick="apagarComentario(${c.id})" title="Apagar meu comentário"><i class="fas fa-trash"></i></button>`;
+          if (usuarioLogado && (c.usuario_id === usuarioLogado.id || usuarioLogado.role === 'admin')) {
+            lixeiraHtml = `<button class="btn-apagar-comentario" onclick="apagarComentario(${c.id})" title="Apagar comentário"><i class="fas fa-trash"></i> Apagar</button>`;
           }
 
+          // Se for admin, exibe o e-mail do usuário do lado do nome
+          let infoAutor = `<strong>${c.nome}</strong>`;
+          if (usuarioLogado && usuarioLogado.role === 'admin') {
+            infoAutor += ` <span style="font-size: 0.85em; color: #a3a3a3;">(${c.email})</span>`;
+          }
+
+          // Monta o visual final do comentário
           div.innerHTML = `
             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-              <strong>${c.nome}:</strong>
+              <div>${infoAutor}</div>
               ${lixeiraHtml}
             </div>
             <span>${c.texto}</span>
           `;
+          
           container.appendChild(div);
         });
       } catch (err) {
@@ -248,7 +256,6 @@
       }
     }
 
-    // NOVA FUNÇÃO: Apagar Comentário
     async function apagarComentario(comentarioId) {
       if (!confirm('Tem certeza que deseja apagar este comentário?')) return;
 

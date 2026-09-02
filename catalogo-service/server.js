@@ -149,17 +149,33 @@ app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome 
-     FROM comentarios c 
-     JOIN usuarios u ON c.usuario_id = u.id 
-     WHERE c.tmdb_movie_id = ? AND c.usuario_id = ? 
-     ORDER BY c.criado_em DESC`,
-    [req.params.id, req.session.usuario.id]
-  );
-  res.json(rows);
-});
+  try {
+    const is_admin = req.session.usuario.role === 'admin';
+    
+    // Texto base da query (agora buscando o u.email também)
+    let sql = `
+      SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome, u.email
+      FROM comentarios c
+      JOIN usuarios u ON c.usuario_id = u.id
+      WHERE c.tmdb_movie_id = ?
+    `;
+    
+    const params = [req.params.id];
 
+    // Se NÃO for admin, adiciona a trava para ver só os próprios comentários
+    if (!is_admin) {
+      sql += ' AND c.usuario_id = ?';
+      params.push(req.session.usuario.id);
+    }
+
+    sql += ' ORDER BY c.criado_em DESC';
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar comentários' });
+  }
+});
 app.post('/api/comentarios', authMiddleware, async (req, res) => {
   await pool.query(
     'INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto) VALUES (?, ?, ?)',
@@ -170,8 +186,24 @@ app.post('/api/comentarios', authMiddleware, async (req, res) => {
 
 app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM comentarios WHERE id = ? AND usuario_id = ?', [req.params.id, req.session.usuario.id]);
-    if (result.affectedRows === 0) return res.status(403).json({ error: 'Não autorizado.' });
+    const is_admin = req.session.usuario.role === 'admin';
+    
+    let sql = 'DELETE FROM comentarios WHERE id = ?';
+    const params = [req.params.id];
+
+    // Se NÃO for admin, exige que o usuario_id seja o dono do comentário
+    if (!is_admin) {
+      sql += ' AND usuario_id = ?';
+      params.push(req.session.usuario.id);
+    }
+
+    const [result] = await pool.query(sql, params);
+    
+    // Se não apagou nenhuma linha, é porque o comentário não existe ou o cara não tem permissão
+    if (result.affectedRows === 0) {
+      return res.status(403).json({ error: 'Não autorizado.' });
+    }
+    
     res.json({ message: 'Apagado' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao apagar.' });
