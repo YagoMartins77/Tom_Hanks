@@ -1,3 +1,17 @@
+// Função para enviar eventos para o microsserviço de auditoria
+async function registrarAuditoria(usuario_id, acao, detalhes = '') {
+    try {
+        // Usa o nome do serviço definido no docker-compose (log-service) e a porta 3002
+        await fetch('http://log-service:3002/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id, acao, detalhes })
+        });
+    } catch (error) {
+        console.error('Erro ao enviar log para auditoria:', error.message);
+    }
+}
+
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -50,6 +64,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
+
 // Login
 app.post('/login', async (req, res) => {
   const { email, senha } = req.body;
@@ -59,12 +74,22 @@ app.post('/login', async (req, res) => {
 
   try {
     const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
-    if (rows.length === 0) return res.status(401).json({ error: 'Credenciais inválidas.' });
+    if (rows.length === 0) {
+      // FALHA: Usuário não encontrado
+      await registrarAuditoria('anonimo', 'login_falha', `E-mail inexistente: ${email}`);
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
+    }
 
     const user = rows[0];
     const match = await bcrypt.compare(senha, user.senha_hash);
-    if (!match) return res.status(401).json({ error: 'Credenciais inválidas.' });
+    if (!match) {
+      // FALHA: Senha incorreta
+      await registrarAuditoria(user.id, 'login_falha', `Senha incorreta para o email ${user.email}`);
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
+    }
 
+    // SUCESSO!
+    await registrarAuditoria(user.id, 'login_sucesso', `Sessão iniciada pelo email ${user.email}`);
     res.json({ id: user.id, nome: user.nome, email: user.email, role: user.role });
   } catch (err) {
     console.error('Erro no login:', err);
@@ -130,7 +155,9 @@ app.post('/reset-password', async (req, res) => {
       [token]
     );
 
-    if (rows.length === 0) {
+   if (rows.length === 0) {
+      // (Opcional) Logar tentativa de uso de token falso/expirado
+      await registrarAuditoria('anonimo', 'reset_senha_falha', 'Tentativa de uso de token inválido/expirado');
       return res.status(400).json({ error: 'Token inválido, já utilizado ou expirado após 30 minutos.' });
     }
 
@@ -139,6 +166,9 @@ app.post('/reset-password', async (req, res) => {
 
     await pool.query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [hash, resetRecord.usuario_id]);
     await pool.query('UPDATE reset_tokens SET usado = TRUE WHERE id = ?', [resetRecord.id]);
+
+    // SUCESSO: Registrar a mudança de senha!
+    await registrarAuditoria(resetRecord.usuario_id, 'senha_redefinida', 'Usuário redefiniu a senha via token de e-mail');
 
     res.json({ message: 'Senha atualizada com sucesso!' });
   } catch (err) {
