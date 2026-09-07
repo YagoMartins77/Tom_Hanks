@@ -45,3 +45,20 @@ services:
       - SMTP_PASS=${SMTP_PASS}
     networks:
       - app-network
+
+log-service:
+    build: ./log-service
+    container_name: log-service-yago
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis-auditoria-yago:6379
+      - PORT=3002
+    networks:
+      - app-network
+
+redis-auditoria:
+    image: redis:alpine
+    container_name: redis-auditoria-yago
+    restart: always
+    networks:
+      - app-network
