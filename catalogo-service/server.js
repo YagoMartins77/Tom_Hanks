@@ -53,6 +53,19 @@ const authLimiter = rateLimit({
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3001';
 
+// NOVA FUNÇÃO: Dispara logs para o microsserviço de auditoria
+async function registrarAuditoria(usuario_id, acao, detalhes = '') {
+    try {
+        await fetch('http://log-service:3002/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id, acao, detalhes })
+        });
+    } catch (error) {
+        console.error('Erro ao enviar log para auditoria:', error.message);
+    }
+}
+
 function authMiddleware(req, res, next) {
   if (!req.session.usuario) return res.status(401).json({ error: 'Faça login.' });
   next();
@@ -137,14 +150,17 @@ app.post('/api/favoritos', authMiddleware, async (req, res) => {
       'INSERT INTO favoritos (usuario_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
       [req.session.usuario.id, tmdb_movie_id, titulo, poster_path]
     );
+    // AUDITORIA AQUI (SUCESSO)
+    await registrarAuditoria(req.session.usuario.id, 'favoritar_filme', `Filme ID: ${tmdb_movie_id} - ${titulo}`);
     res.status(201).json({ message: 'Favoritado' });
   } catch (err) {
     res.status(400).json({ error: 'Já favoritado' });
   }
 });
-
 app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
   await pool.query('DELETE FROM favoritos WHERE usuario_id = ? AND tmdb_movie_id = ?', [req.session.usuario.id, req.params.id]);
+  // AUDITORIA AQUI (SUCESSO)
+  await registrarAuditoria(req.session.usuario.id, 'desfavoritar_filme', `Removeu o Filme ID: ${req.params.id}`);
   res.json({ message: 'Removido' });
 });
 
@@ -181,6 +197,8 @@ app.post('/api/comentarios', authMiddleware, async (req, res) => {
     'INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto) VALUES (?, ?, ?)',
     [req.session.usuario.id, req.body.tmdb_movie_id, req.body.texto.trim()]
   );
+  // AUDITORIA AQUI (SUCESSO)
+  await registrarAuditoria(req.session.usuario.id, 'criar_comentario', `Comentou no Filme ID: ${req.body.tmdb_movie_id}`);
   res.status(201).json({ message: 'Comentado' });
 });
 
@@ -191,7 +209,6 @@ app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
     let sql = 'DELETE FROM comentarios WHERE id = ?';
     const params = [req.params.id];
 
-    // Se NÃO for admin, exige que o usuario_id seja o dono do comentário
     if (!is_admin) {
       sql += ' AND usuario_id = ?';
       params.push(req.session.usuario.id);
@@ -199,11 +216,14 @@ app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
 
     const [result] = await pool.query(sql, params);
     
-    // Se não apagou nenhuma linha, é porque o comentário não existe ou o cara não tem permissão
     if (result.affectedRows === 0) {
+      // AUDITORIA AQUI (FALHA - ACESSO NEGADO 403)
+      await registrarAuditoria(req.session.usuario.id, 'tentativa_nao_autorizada_403', `Tentou apagar comentário ID: ${req.params.id} sem permissão`);
       return res.status(403).json({ error: 'Não autorizado.' });
     }
     
+    // AUDITORIA AQUI (SUCESSO)
+    await registrarAuditoria(req.session.usuario.id, 'deletar_comentario', `Apagou o comentário ID: ${req.params.id}`);
     res.json({ message: 'Apagado' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao apagar.' });
