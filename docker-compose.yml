@@ -28,6 +28,7 @@ services:
       - app-network
     depends_on:
       - auth-service
+      - log-service  # Recomendado: para garantir que o serviço de logs já esteja de pé
 
   auth-service:
     build: ./auth-service
@@ -47,18 +48,20 @@ services:
       - app-network
 
   log-service:
-      build: ./log-service
-      container_name: log-service-yago
-      restart: always
-      environment:
-        - REDIS_URL=redis://redis-auditoria-yago:6379
-        - PORT=3002
-      networks:
-        - app-network
+    build: ./log-service
+    container_name: log-service-yago
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis-auditoria-yago:6379
+      - PORT=3002
+    networks:
+      - app-network
+    depends_on:
+      - redis-auditoria  # AJUSTE: Garante que o Redis suba antes do log-service ligar
 
   redis-auditoria:
-      image: redis:alpine
-      container_name: redis-auditoria-yago
-      restart: always
-      networks:
-        - app-network
+    image: redis:alpine
+    container_name: redis-auditoria-yago
+    restart: always
+    networks:
+      - app-network

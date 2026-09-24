@@ -228,6 +228,24 @@ app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Erro ao apagar.' });
   }
+  // Rota para buscar os logs de auditoria (Apenas Admin)
+app.get('/api/logs', authMiddleware, async (req, res) => {
+    // Verifica se o usuário é administrador
+    if (req.session.usuario.role !== 'admin') {
+        return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem ver os logs.' });
+    }
+
+    try {
+        // Faz a requisição para o microsserviço de logs
+        const response = await fetch('http://log-service:3002/logs');
+        const logs = await response.json();
+        
+        res.json(logs);
+    } catch (error) {
+        console.error('Erro ao buscar logs:', error.message);
+        res.status(500).json({ error: 'Erro ao conectar com o serviço de auditoria.' });
+    }
+});
 });
 
 const PORT = process.env.PORT || 3000;
