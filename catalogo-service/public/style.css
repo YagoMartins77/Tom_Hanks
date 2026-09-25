@@ -302,3 +302,224 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 .btn-apagar-comentario:hover {
   color: #e50914; /* Fica vermelho ao passar o mouse */
 }
+
+/* =========================================
+   8. PAINEL DO ADMINISTRADOR
+   ========================================= */
+.btn-admin {
+  background: linear-gradient(135deg, #e50914, #b20710);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.btn-admin:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+}
+
+.admin-modal-content {
+  background-color: #1a1a1a;
+  width: 95%;
+  max-width: 1100px;
+  max-height: 90vh;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+  border: 1px solid #333;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background-color: #121212;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.admin-header h2 {
+  font-size: 1.5rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-header h2 i {
+  color: #e50914;
+}
+
+.admin-tabs {
+  display: flex;
+  background-color: #161616;
+  border-bottom: 1px solid #2a2a2a;
+  padding: 0 25px;
+  gap: 10px;
+}
+
+.admin-tab-btn {
+  background: transparent;
+  color: #888;
+  border: none;
+  padding: 14px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-tab-btn:hover {
+  color: #ddd;
+}
+
+.admin-tab-btn.active {
+  color: #fff;
+  border-bottom: 3px solid #e50914;
+}
+
+.admin-tab-body {
+  padding: 25px;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-secondary {
+  background-color: #2b2b2b;
+  color: #ddd;
+  border: 1px solid #444;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #383838;
+  color: white;
+}
+
+/* Tabelas Administrativas */
+.admin-table-container {
+  overflow-x: auto;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #141414;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.admin-table th {
+  background-color: #1f1f1f;
+  color: #aaa;
+  padding: 12px 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #222;
+  color: #ddd;
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+  background-color: #1b1b1b;
+}
+
+/* Badges de Auditoria */
+.log-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-login-ok { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
+.badge-login-fail { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.4); }
+.badge-comment { background: rgba(52, 152, 219, 0.2); color: #3498db; border: 1px solid rgba(52, 152, 219, 0.4); }
+.badge-fav { background: rgba(241, 196, 15, 0.2); color: #f1c40f; border: 1px solid rgba(241, 196, 15, 0.4); }
+.badge-unfav { background: rgba(230, 126, 34, 0.2); color: #e67e22; border: 1px solid rgba(230, 126, 34, 0.4); }
+.badge-delete { background: rgba(155, 89, 182, 0.2); color: #9b59b6; border: 1px solid rgba(155, 89, 182, 0.4); }
+.badge-403 { background: rgba(229, 9, 20, 0.25); color: #ff4d4d; border: 1px solid #e50914; font-weight: 800; }
+.badge-logout { background: rgba(149, 165, 166, 0.2); color: #bdc3c7; border: 1px solid rgba(149, 165, 166, 0.4); }
+.badge-default { background: rgba(127, 140, 141, 0.2); color: #95a5a6; border: 1px solid rgba(127, 140, 141, 0.4); }
+
+/* Botão de Excluir Log */
+.btn-del-log {
+  background-color: transparent;
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-del-log:hover {
+  background-color: #e50914;
+  color: white;
+  border-color: #e50914;
+}
+
+/* Botão de Excluir Comentário na Tabela */
+.btn-del-comment-admin {
+  background-color: transparent;
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-del-comment-admin:hover {
+  background-color: #e74c3c;
+  color: white;
+}

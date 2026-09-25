@@ -3,120 +3,538 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Autenticação - Catálogo Tom Hanks</title>
+  <title>Catálogo Tom Hanks</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="auth-page">
-  <div class="auth-card">
-    <h2 id="formTitle">Entrar</h2>
-    
-    <form id="authForm">
-      <input type="text" id="nome" placeholder="Seu Nome" style="display: none;">
-      <input type="email" id="email" placeholder="E-mail" required>
-      <input type="password" id="senha" placeholder="Senha" required>
-      <button type="submit" id="submitBtn">Entrar</button>
-    </form>
-    
-    <p id="toggleText">
-      Não tem uma conta? <a onclick="setMode('cadastro')">Cadastre-se</a>
-    </p>
-    <p id="forgotText">
-      <a onclick="setMode('esqueci')">Esqueci minha senha</a>
-    </p>
-    
-    <p id="msgErro" style="margin-top: 15px; font-weight: bold; text-align: center;"></p>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>Catálogo Tom Hanks</h1>
+      
+      <div class="search-container">
+        <i class="fas fa-search lupa-icon"></i>
+        <input type="text" id="searchInput" placeholder="Pesquisar filme..." onkeyup="pesquisarFilme()">
+      </div>
+
+      <div class="user-menu">
+        <span id="userName"></span>
+        <button id="btnAdmin" class="btn-admin" style="display: none;" onclick="abrirAdminModal()">
+          <i class="fas fa-shield-alt"></i> Painel Admin
+        </button>
+        <button onclick="fazerLogout()" class="btn-sair">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="toastMensagem" class="toast hidden"></div>
+
+  <main>
+    <div id="listaFilmes" class="grid-filmes"></div>
+  </main>
+
+  <!-- MODAL DE DETALHES DO FILME -->
+  <div id="filmeModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-body">
+        <img id="modalPoster" src="" alt="Poster do Filme">
+        <div class="modal-info">
+          <div class="modal-header-top">
+            <h2 id="modalTitulo"></h2>
+            <div style="display: flex; gap: 20px; align-items: center;">
+              <i id="modalEstrela" class="far fa-star estrela-btn-modal"></i>
+              <button class="fechar-modal" onclick="fecharModal()" title="Fechar">&times;</button>
+            </div>
+          </div>
+
+          <h3>Sinopse</h3>
+          <p id="modalSinopse">Sinopse não disponível.</p>
+          
+          <hr>
+          
+          <h3>Comentários</h3>
+          <div id="listaComentarios" class="comentarios-container"></div>
+          
+          <div class="comentario-form">
+            <input type="text" id="novoComentario" placeholder="Escreva um comentário...">
+            <button onclick="adicionarComentario()">Comentar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DO PAINEL ADMINISTRATIVO -->
+  <div id="adminModal" class="modal hidden">
+    <div class="admin-modal-content">
+      <div class="admin-header">
+        <h2><i class="fas fa-user-shield"></i> Painel do Administrador</h2>
+        <button class="fechar-modal" onclick="fecharAdminModal()" title="Fechar">&times;</button>
+      </div>
+
+      <div class="admin-tabs">
+        <button id="tabBtnMod" class="admin-tab-btn active" onclick="trocarAbaAdmin('mod')">
+          <i class="fas fa-comments"></i> Moderação de Comentários
+        </button>
+        <button id="tabBtnLogs" class="admin-tab-btn" onclick="trocarAbaAdmin('logs')">
+          <i class="fas fa-clipboard-list"></i> Logs de Auditoria (Redis)
+        </button>
+      </div>
+
+      <div class="admin-tab-body">
+        <!-- ABA 1: MODERAÇÃO DE COMENTÁRIOS -->
+        <div id="abaMod">
+          <div class="admin-toolbar">
+            <span style="color: #aaa;">Moderação global de comentários (deletar comentários de terceiros):</span>
+            <button class="btn-secondary" onclick="carregarComentariosAdmin()">
+              <i class="fas fa-sync-alt"></i> Atualizar Comentários
+            </button>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Autor</th>
+                  <th>E-mail</th>
+                  <th>Filme TMDB</th>
+                  <th>Comentário</th>
+                  <th>Data</th>
+                  <th style="text-align: center;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaComentariosBody">
+                <tr><td colspan="7" style="text-align: center; color: #888;">Carregando comentários...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ABA 2: LOGS DE AUDITORIA (REDIS STREAMS) -->
+        <div id="abaLogs" style="display: none;">
+          <div class="admin-toolbar">
+            <span style="color: #aaa;">Eventos gravados no Redis Streams (<code style="color: #e50914;">auditoria:logs</code>):</span>
+            <button class="btn-secondary" onclick="carregarLogsAdmin()">
+              <i class="fas fa-sync-alt"></i> Atualizar Logs
+            </button>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>ID Redis</th>
+                  <th>Usuário</th>
+                  <th>Ação</th>
+                  <th>IP Origem</th>
+                  <th>Detalhes</th>
+                  <th style="text-align: center;">Gerenciar</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaLogsBody">
+                <tr><td colspan="7" style="text-align: center; color: #888;">Carregando registros de auditoria...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
-    let currentMode = 'login'; // login, cadastro, esqueci
+    let filmesGlobais = [];
+    let favoritosIds = new Set();
+    let filmeAtualExpandido = null;
+    let usuarioLogado = null; 
 
-    function setMode(mode) {
-      currentMode = mode;
-      const nomeInput = document.getElementById('nome');
-      const senhaInput = document.getElementById('senha');
-      const title = document.getElementById('formTitle');
-      const btn = document.getElementById('submitBtn');
-      const toggle = document.getElementById('toggleText');
-      const forgot = document.getElementById('forgotText');
-      const msg = document.getElementById('msgErro');
-      msg.textContent = '';
+    // Inicialização da Página
+    async function iniciarCatalogo() {
+      try {
+        const userRes = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (!userRes.ok) return window.location.href = 'auth.html';
+        
+        usuarioLogado = await userRes.json();
+        document.getElementById('userName').textContent = `Olá, ${usuarioLogado.nome}`;
 
-      if (mode === 'login') {
-        nomeInput.style.display = 'none';
-        nomeInput.required = false;
-        senhaInput.style.display = 'block';
-        senhaInput.required = true;
-        title.textContent = 'Entrar';
-        btn.textContent = 'Entrar';
-        toggle.innerHTML = 'Não tem uma conta? <a onclick="setMode(\'cadastro\')">Cadastre-se</a>';
-        forgot.style.display = 'block';
-      } else if (mode === 'cadastro') {
-        nomeInput.style.display = 'block';
-        nomeInput.required = true;
-        senhaInput.style.display = 'block';
-        senhaInput.required = true;
-        title.textContent = 'Cadastrar';
-        btn.textContent = 'Cadastrar';
-        toggle.innerHTML = 'Já tem uma conta? <a onclick="setMode(\'login\')">Faça Login</a>';
-        forgot.style.display = 'none';
-      } else if (mode === 'esqueci') {
-        nomeInput.style.display = 'none';
-        nomeInput.required = false;
-        senhaInput.style.display = 'none';
-        senhaInput.required = false;
-        title.textContent = 'Recuperar Senha';
-        btn.textContent = 'Enviar Link por E-mail';
-        toggle.innerHTML = 'Lembrou a senha? <a onclick="setMode(\'login\')">Voltar ao Login</a>';
-        forgot.style.display = 'none';
+        // Se for admin, exibe o botão de acesso ao Painel Admin
+        if (usuarioLogado.role === 'admin') {
+          const btnAdmin = document.getElementById('btnAdmin');
+          if (btnAdmin) btnAdmin.style.display = 'inline-flex';
+        }
+
+        const favRes = await fetch('/api/favoritos', { cache: 'no-store' });
+        if (favRes.ok) {
+          const favoritos = await favRes.json();
+          favoritos.forEach(f => favoritosIds.add(f.tmdb_movie_id));
+        }
+
+        const filmesRes = await fetch('/api/filmes');
+        if (filmesRes.ok) {
+          filmesGlobais = await filmesRes.json();
+          renderizarFilmes(filmesGlobais);
+        }
+      } catch (err) {
+        mostrarToast('Erro ao carregar o catálogo', 'erro');
       }
     }
 
-    document.getElementById('authForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const nome = document.getElementById('nome').value;
-      const email = document.getElementById('email').value;
-      const senha = document.getElementById('senha').value;
-      const msg = document.getElementById('msgErro');
+    function renderizarFilmes(filmes) {
+      const container = document.getElementById('listaFilmes');
+      container.innerHTML = '';
 
-      let endpoint = '/api/auth/login';
-      let body = { email, senha };
+      filmes.forEach(filme => {
+        if (!filme.poster_path) return;
 
-      if (currentMode === 'cadastro') {
-        endpoint = '/api/auth/register';
-        body = { nome, email, senha };
-      } else if (currentMode === 'esqueci') {
-        endpoint = '/api/auth/forgot-password';
-        body = { email };
+        const cartao = document.createElement('div');
+        cartao.className = 'filme-card';
+        cartao.onclick = () => abrirModal(filme);
+
+        cartao.innerHTML = `
+          <div class="poster-container">
+            <img src="https://image.tmdb.org/t/p/w500${filme.poster_path}" alt="${filme.title}">
+          </div>
+          <div class="card-info">
+            <h3>${filme.title}</h3>
+            <p>${filme.release_date ? filme.release_date.split('-')[0] : ''}</p>
+          </div>
+        `;
+        container.appendChild(cartao);
+      });
+    }
+
+    function pesquisarFilme() {
+      const termo = document.getElementById('searchInput').value.toLowerCase();
+      const filmesFiltrados = filmesGlobais.filter(filme => 
+        filme.title.toLowerCase().includes(termo)
+      );
+      renderizarFilmes(filmesFiltrados);
+    }
+
+    // Modal de Detalhes do Filme
+    function abrirModal(filme) {
+      filmeAtualExpandido = filme;
+      document.getElementById('modalTitulo').textContent = filme.title;
+      document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível.';
+      document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
+      
+      const modalEstrela = document.getElementById('modalEstrela');
+      modalEstrela.onclick = () => toggleFavoritoModal(filme.id, filme.title, filme.poster_path);
+
+      if (favoritosIds.has(filme.id)) {
+        modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
+      } else {
+        modalEstrela.className = 'far fa-star fav-inactive estrela-btn-modal';
       }
+      
+      document.getElementById('filmeModal').classList.remove('hidden');
+      document.getElementById('novoComentario').value = '';
+      
+      carregarComentarios(filme.id);
+    }
+
+    function fecharModal() {
+      document.getElementById('filmeModal').classList.add('hidden');
+      filmeAtualExpandido = null;
+    }
+
+    window.addEventListener('click', function(event) {
+      const filmeModal = document.getElementById('filmeModal');
+      const adminModal = document.getElementById('adminModal');
+      if (event.target === filmeModal) fecharModal();
+      if (event.target === adminModal) fecharAdminModal();
+    });
+
+    async function toggleFavoritoModal(id, titulo, poster) {
+      const modalEstrela = document.getElementById('modalEstrela');
+      const isFav = favoritosIds.has(id);
 
       try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
+        if (isFav) {
+          const res = await fetch(`/api/favoritos/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Erro ao remover');
 
-        if (res.ok) {
-          if (currentMode === 'login') {
-            window.location.href = 'index.html';
-          } else if (currentMode === 'cadastro') {
-            msg.style.color = 'green';
-            msg.textContent = 'Cadastrado com sucesso!';
-            setTimeout(() => setMode('login'), 1500);
-          } else {
-            msg.style.color = 'green';
-            msg.textContent = data.message || 'Verifique seu e-mail no Mailtrap.';
-          }
+          favoritosIds.delete(id);
+          modalEstrela.className = 'far fa-star fav-inactive estrela-btn-modal';
+          mostrarToast('Removido dos favoritos!');
         } else {
-          msg.style.color = '#e50914';
-          msg.textContent = data.error || 'Erro na requisição.';
+          const res = await fetch('/api/favoritos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tmdb_movie_id: id, titulo: titulo, poster_path: poster })
+          });
+          if (!res.ok) throw new Error('Erro ao favoritar');
+
+          favoritosIds.add(id);
+          modalEstrela.className = 'fas fa-star fav-active estrela-btn-modal';
+          mostrarToast('Adicionado aos favoritos!');
         }
       } catch (err) {
-        msg.style.color = '#e50914';
-        msg.textContent = 'Erro de conexão com o servidor.';
+        mostrarToast('Erro ao favoritar.', 'erro');
       }
-    });
+    }
+
+    async function carregarComentarios(movieId) {
+      const container = document.getElementById('listaComentarios');
+      container.innerHTML = 'Carregando...';
+      
+      try {
+        const res = await fetch(`/api/comentarios/${movieId}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Erro');
+        
+        const comentarios = await res.json();
+        
+        container.innerHTML = '';
+        if (!Array.isArray(comentarios) || comentarios.length === 0) {
+          container.innerHTML = '<p class="sem-comentarios">Seja o primeiro a comentar!</p>';
+          return;
+        }
+
+        comentarios.forEach(c => {
+          const div = document.createElement('div');
+          div.className = 'comentario-item';
+          
+          let lixeiraHtml = '';
+          if (usuarioLogado && (c.usuario_id === usuarioLogado.id || usuarioLogado.role === 'admin')) {
+            lixeiraHtml = `<button class="btn-apagar-comentario" onclick="apagarComentario(${c.id})" title="Apagar comentário"><i class="fas fa-trash"></i> Apagar</button>`;
+          }
+
+          let infoAutor = `<strong>${c.nome}</strong>`;
+          if (usuarioLogado && usuarioLogado.role === 'admin') {
+            infoAutor += ` <span style="font-size: 0.85em; color: #a3a3a3;">(${c.email})</span>`;
+          }
+
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <div>${infoAutor}</div>
+              ${lixeiraHtml}
+            </div>
+            <span>${c.texto}</span>
+          `;
+          
+          container.appendChild(div);
+        });
+      } catch (err) {
+        container.innerHTML = '<p class="sem-comentarios" style="color:#e50914;">Erro ao carregar os comentários.</p>';
+      }
+    }
+
+    async function adicionarComentario() {
+      const texto = document.getElementById('novoComentario').value;
+      if (!texto.trim() || !filmeAtualExpandido) return;
+
+      try {
+        const res = await fetch('/api/comentarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tmdb_movie_id: filmeAtualExpandido.id, texto })
+        });
+        if (!res.ok) throw new Error('Erro');
+
+        document.getElementById('novoComentario').value = '';
+        carregarComentarios(filmeAtualExpandido.id);
+        mostrarToast('Comentário publicado!');
+      } catch (err) {
+        mostrarToast('Erro ao publicar comentário', 'erro');
+      }
+    }
+
+    async function apagarComentario(comentarioId) {
+      if (!confirm('Tem certeza que deseja apagar este comentário?')) return;
+
+      try {
+        const res = await fetch(`/api/comentarios/${comentarioId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Erro ao apagar');
+        
+        mostrarToast('Comentário apagado!');
+        carregarComentarios(filmeAtualExpandido.id);
+      } catch (err) {
+        mostrarToast('Erro ao apagar o comentário', 'erro');
+      }
+    }
+
+    // =========================================
+    // FUNÇÕES DO PAINEL DO ADMINISTRADOR
+    // =========================================
+    function abrirAdminModal() {
+      document.getElementById('adminModal').classList.remove('hidden');
+      trocarAbaAdmin('mod');
+    }
+
+    function fecharAdminModal() {
+      document.getElementById('adminModal').classList.add('hidden');
+    }
+
+    function trocarAbaAdmin(aba) {
+      const tabBtnMod = document.getElementById('tabBtnMod');
+      const tabBtnLogs = document.getElementById('tabBtnLogs');
+      const abaMod = document.getElementById('abaMod');
+      const abaLogs = document.getElementById('abaLogs');
+
+      if (aba === 'mod') {
+        tabBtnMod.classList.add('active');
+        tabBtnLogs.classList.remove('active');
+        abaMod.style.display = 'block';
+        abaLogs.style.display = 'none';
+        carregarComentariosAdmin();
+      } else {
+        tabBtnLogs.classList.add('active');
+        tabBtnMod.classList.remove('active');
+        abaLogs.style.display = 'block';
+        abaMod.style.display = 'none';
+        carregarLogsAdmin();
+      }
+    }
+
+    // Carregar Comentários de Todos para Moderação
+    async function carregarComentariosAdmin() {
+      const tbody = document.getElementById('tabelaComentariosBody');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #888;">Carregando comentários...</td></tr>';
+
+      try {
+        const res = await fetch('/api/admin/comentarios', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Erro na consulta');
+        const comentarios = await res.json();
+
+        tbody.innerHTML = '';
+        if (comentarios.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #888;">Nenhum comentário registrado ainda.</td></tr>';
+          return;
+        }
+
+        comentarios.forEach(c => {
+          const tr = document.createElement('tr');
+          const dataFormatada = new Date(c.criado_em).toLocaleString('pt-BR');
+          tr.innerHTML = `
+            <td>#${c.id}</td>
+            <td><strong>${c.nome}</strong> (ID: ${c.usuario_id})</td>
+            <td style="color: #aaa;">${c.email}</td>
+            <td><span style="background: #2a2a2a; padding: 2px 6px; border-radius: 4px;">ID: ${c.tmdb_movie_id}</span></td>
+            <td style="max-width: 300px; word-break: break-word;">${c.texto}</td>
+            <td style="color: #888; font-size: 0.8rem;">${dataFormatada}</td>
+            <td style="text-align: center;">
+              <button class="btn-del-comment-admin" onclick="apagarComentarioAdmin(${c.id})">
+                <i class="fas fa-trash"></i> Apagar
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #e50914;">Erro ao carregar comentários para moderação.</td></tr>';
+      }
+    }
+
+    async function apagarComentarioAdmin(comentarioId) {
+      if (!confirm(`Tem certeza que deseja apagar o comentário #${comentarioId}? Esta ação ficará gravada no log de auditoria.`)) return;
+
+      try {
+        const res = await fetch(`/api/comentarios/${comentarioId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Erro ao apagar');
+        mostrarToast('Comentário de terceiro apagado com sucesso!');
+        carregarComentariosAdmin();
+      } catch (err) {
+        mostrarToast('Falha ao apagar o comentário.', 'erro');
+      }
+    }
+
+    // Carregar Logs de Auditoria do Redis
+    async function carregarLogsAdmin() {
+      const tbody = document.getElementById('tabelaLogsBody');
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #888;">Consultando Redis Streams...</td></tr>';
+
+      try {
+        const res = await fetch('/api/logs?limit=100', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Erro na consulta dos logs');
+        const logs = await res.json();
+
+        tbody.innerHTML = '';
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #888;">Nenhum evento registrado no Redis ainda.</td></tr>';
+          return;
+        }
+
+        logs.forEach(log => {
+          const tr = document.createElement('tr');
+          const dataFormatada = log.data_hora ? new Date(log.data_hora).toLocaleString('pt-BR') : log.id_redis;
+          const badgeHtml = obterBadgeAcao(log.acao);
+
+          tr.innerHTML = `
+            <td style="font-size: 0.8rem; color: #bbb; white-space: nowrap;">${dataFormatada}</td>
+            <td style="font-family: monospace; font-size: 0.75rem; color: #777;">${log.id_redis}</td>
+            <td><strong>${log.usuario_id === 'anonimo' ? 'Anônimo' : `Usuário #${log.usuario_id}`}</strong></td>
+            <td>${badgeHtml}</td>
+            <td style="font-family: monospace; font-size: 0.78rem; color: #aaa;">${log.ip || '-'}</td>
+            <td style="font-size: 0.82rem; color: #ddd; max-width: 280px; word-break: break-word;">${log.detalhes || '-'}</td>
+            <td style="text-align: center;">
+              <button class="btn-del-log" onclick="apagarLogAdmin('${log.id_redis}')" title="Apagar este evento do Redis Streams">
+                <i class="fas fa-trash-alt"></i> Apagar
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #e50914;">Erro ao carregar logs do microsserviço.</td></tr>';
+      }
+    }
+
+    // Apagar Log Específico do Redis Streams
+    async function apagarLogAdmin(idRedis) {
+      if (!confirm(`Deseja realmente apagar o registro de log [${idRedis}] do Redis Streams?`)) return;
+
+      try {
+        const res = await fetch(`/api/logs/${idRedis}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Erro ao apagar log');
+        mostrarToast('Registro de auditoria removido do Redis!');
+        carregarLogsAdmin();
+      } catch (err) {
+        mostrarToast('Erro ao remover registro de auditoria.', 'erro');
+      }
+    }
+
+    // Helper para gerar Badges coloridos
+    function obterBadgeAcao(acao) {
+      switch (acao) {
+        case 'login_sucesso':
+          return '<span class="log-badge badge-login-ok"><i class="fas fa-sign-in-alt"></i> Login OK</span>';
+        case 'login_falha':
+          return '<span class="log-badge badge-login-fail"><i class="fas fa-times-circle"></i> Login Falha</span>';
+        case 'logout':
+          return '<span class="log-badge badge-logout"><i class="fas fa-sign-out-alt"></i> Logout</span>';
+        case 'favoritar_filme':
+          return '<span class="log-badge badge-fav"><i class="fas fa-star"></i> Favoritou</span>';
+        case 'desfavoritar_filme':
+          return '<span class="log-badge badge-unfav"><i class="far fa-star"></i> Desfavoritou</span>';
+        case 'criar_comentario':
+          return '<span class="log-badge badge-comment"><i class="fas fa-comment"></i> Comentou</span>';
+        case 'deletar_comentario':
+          return '<span class="log-badge badge-delete"><i class="fas fa-trash"></i> Apagou Comentário</span>';
+        case 'tentativa_negada_403':
+          return '<span class="log-badge badge-403"><i class="fas fa-shield-virus"></i> 403 Bloqueado</span>';
+        case 'deletar_log':
+          return '<span class="log-badge badge-delete"><i class="fas fa-eraser"></i> Apagou Log</span>';
+        default:
+          return `<span class="log-badge badge-default">${acao}</span>`;
+      }
+    }
+
+    function mostrarToast(mensagem, tipo = 'sucesso') {
+      const toast = document.getElementById('toastMensagem');
+      toast.textContent = mensagem;
+      toast.className = `toast show ${tipo}`;
+      setTimeout(() => {
+        toast.className = 'toast hidden';
+      }, 3000);
+    }
+
+    async function fazerLogout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = 'auth.html';
+    }
+
+    iniciarCatalogo();
   </script>
 </body>
 </html>

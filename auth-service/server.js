@@ -1,17 +1,3 @@
-// Função para enviar eventos para o microsserviço de auditoria
-async function registrarAuditoria(usuario_id, acao, detalhes = '') {
-    try {
-        // Usa o nome do serviço definido no docker-compose (log-service) e a porta 3002
-        await fetch('http://log-service:3002/logs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario_id, acao, detalhes })
-        });
-    } catch (error) {
-        console.error('Erro ao enviar log para auditoria:', error.message);
-    }
-}
-
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -21,6 +7,28 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(express.json());
+
+const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3002';
+
+// Função para obter o IP do cliente
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket?.remoteAddress || '';
+}
+
+// Função para enviar eventos para o microsserviço de auditoria
+async function registrarAuditoria(usuario_id, acao, detalhes = '', ip = '') {
+  try {
+    await fetch(`${LOG_SERVICE_URL}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario_id, acao, detalhes, ip })
+    });
+  } catch (error) {
+    console.error('Erro ao enviar log para auditoria:', error.message);
+  }
+}
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -49,6 +57,8 @@ app.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Campos obrigatórios ausentes.' });
   }
 
+  const clientIp = getClientIp(req);
+
   try {
     const userRole = 'usuario';
     const hash = await bcrypt.hash(senha, 12);
@@ -56,6 +66,9 @@ app.post('/register', async (req, res) => {
       'INSERT INTO usuarios (nome, email, senha_hash, role) VALUES (?, ?, ?, ?)',
       [nome.trim(), email.trim().toLowerCase(), hash, userRole]
     );
+
+    await registrarAuditoria(result.insertId, 'cadastro_sucesso', `Novo usuário cadastrado: ${email}`, clientIp);
+
     res.status(201).json({ id: result.insertId, nome, email, role: userRole });
   } catch (err) {
     console.error('Erro no register:', err);
@@ -64,7 +77,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-
 // Login
 app.post('/login', async (req, res) => {
   const { email, senha } = req.body;
@@ -72,11 +84,13 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
   }
 
+  const clientIp = getClientIp(req);
+
   try {
     const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
     if (rows.length === 0) {
       // FALHA: Usuário não encontrado
-      await registrarAuditoria('anonimo', 'login_falha', `E-mail inexistente: ${email}`);
+      await registrarAuditoria('anonimo', 'login_falha', `E-mail inexistente: ${email}`, clientIp);
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
@@ -84,12 +98,12 @@ app.post('/login', async (req, res) => {
     const match = await bcrypt.compare(senha, user.senha_hash);
     if (!match) {
       // FALHA: Senha incorreta
-      await registrarAuditoria(user.id, 'login_falha', `Senha incorreta para o email ${user.email}`);
+      await registrarAuditoria(user.id, 'login_falha', `Senha incorreta para o email ${user.email}`, clientIp);
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
     // SUCESSO!
-    await registrarAuditoria(user.id, 'login_sucesso', `Sessão iniciada pelo email ${user.email}`);
+    await registrarAuditoria(user.id, 'login_sucesso', `Sessão iniciada pelo email ${user.email} (${user.role})`, clientIp);
     res.json({ id: user.id, nome: user.nome, email: user.email, role: user.role });
   } catch (err) {
     console.error('Erro no login:', err);
@@ -101,6 +115,8 @@ app.post('/login', async (req, res) => {
 app.post('/forgot-password', async (req, res) => {
   const { email, baseUrl } = req.body;
   if (!email) return res.status(400).json({ error: 'Informe o e-mail.' });
+
+  const clientIp = getClientIp(req);
 
   try {
     const [users] = await pool.query('SELECT id, nome FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
@@ -135,6 +151,8 @@ app.post('/forgot-password', async (req, res) => {
       `
     });
 
+    await registrarAuditoria(user.id, 'solicitacao_recuperacao_senha', `Solicitou link de recuperação para ${email}`, clientIp);
+
     res.json({ message: 'Se o e-mail existir, o link de recuperação foi enviado.' });
   } catch (err) {
     console.error('ERRO DETALHADO NO FORGOT-PASSWORD:', err);
@@ -149,15 +167,16 @@ app.post('/reset-password', async (req, res) => {
     return res.status(400).json({ error: 'Token inválido ou senha com menos de 6 caracteres.' });
   }
 
+  const clientIp = getClientIp(req);
+
   try {
     const [rows] = await pool.query(
       'SELECT * FROM reset_tokens WHERE token = ? AND usado = FALSE AND expira_em > NOW()',
       [token]
     );
 
-   if (rows.length === 0) {
-      // (Opcional) Logar tentativa de uso de token falso/expirado
-      await registrarAuditoria('anonimo', 'reset_senha_falha', 'Tentativa de uso de token inválido/expirado');
+    if (rows.length === 0) {
+      await registrarAuditoria('anonimo', 'reset_senha_falha', 'Tentativa de uso de token inválido/expirado', clientIp);
       return res.status(400).json({ error: 'Token inválido, já utilizado ou expirado após 30 minutos.' });
     }
 
@@ -167,8 +186,7 @@ app.post('/reset-password', async (req, res) => {
     await pool.query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [hash, resetRecord.usuario_id]);
     await pool.query('UPDATE reset_tokens SET usado = TRUE WHERE id = ?', [resetRecord.id]);
 
-    // SUCESSO: Registrar a mudança de senha!
-    await registrarAuditoria(resetRecord.usuario_id, 'senha_redefinida', 'Usuário redefiniu a senha via token de e-mail');
+    await registrarAuditoria(resetRecord.usuario_id, 'senha_redefinida', 'Usuário redefiniu a senha com sucesso via token', clientIp);
 
     res.json({ message: 'Senha atualizada com sucesso!' });
   } catch (err) {

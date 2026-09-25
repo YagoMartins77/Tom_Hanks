@@ -17,6 +17,7 @@ services:
     environment:
       - PORT=3000
       - AUTH_SERVICE_URL=http://auth-service-yago:3001
+      - LOG_SERVICE_URL=http://log-service-yago:3002
       - TMDB_API_KEY=${TMDB_API_KEY}
       - DB_HOST=35.226.64.52
       - DB_USER=IAC_2026_02_yago_martins
@@ -28,6 +29,7 @@ services:
       - app-network
     depends_on:
       - auth-service
+      - log-service
 
   auth-service:
     build: ./auth-service
@@ -43,22 +45,27 @@ services:
       - SMTP_PORT=587
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+      - LOG_SERVICE_URL=http://log-service-yago:3002
     networks:
       - app-network
+    depends_on:
+      - log-service
 
   log-service:
-      build: ./log-service
-      container_name: log-service-yago
-      restart: always
-      environment:
-        - REDIS_URL=redis://redis-auditoria-yago:6379
-        - PORT=3002
-      networks:
-        - app-network
+    build: ./log-service
+    container_name: log-service-yago
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis-auditoria-yago:6379
+      - PORT=3002
+    networks:
+      - app-network
+    depends_on:
+      - redis-auditoria
 
   redis-auditoria:
-      image: redis:alpine
-      container_name: redis-auditoria-yago
-      restart: always
-      networks:
-        - app-network
+    image: redis:alpine
+    container_name: redis-auditoria-yago
+    restart: always
+    networks:
+      - app-network
