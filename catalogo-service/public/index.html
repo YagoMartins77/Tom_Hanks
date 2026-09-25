@@ -1,137 +1,122 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo de Filmes - Tom Hanks</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autenticação - Catálogo Tom Hanks</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <header style="display: flex; justify-content: space-between; padding: 20px; background: #333; color: white;">
-        <h1>Acervo Tom Hanks</h1>
-        <div>
-            <!-- Este botão só vai aparecer se o usuário for admin -->
-            <button id="btn-admin" style="display: none; background: #f39c12; margin-right: 10px;" onclick="carregarLogs()">Painel de Auditoria</button>
-            <button onclick="sair()" style="background: #e74c3c;">Sair</button>
-        </div>
-    </header>
+<body class="auth-page">
+  <div class="auth-card">
+    <h2 id="formTitle">Entrar</h2>
+    
+    <form id="authForm">
+      <input type="text" id="nome" placeholder="Seu Nome" style="display: none;">
+      <input type="email" id="email" placeholder="E-mail" required>
+      <input type="password" id="senha" placeholder="Senha" required>
+      <button type="submit" id="submitBtn">Entrar</button>
+    </form>
+    
+    <p id="toggleText">
+      Não tem uma conta? <a onclick="setMode('cadastro')">Cadastre-se</a>
+    </p>
+    <p id="forgotText">
+      <a onclick="setMode('esqueci')">Esqueci minha senha</a>
+    </p>
+    
+    <p id="msgErro" style="margin-top: 15px; font-weight: bold; text-align: center;"></p>
+  </div>
 
-    <main style="padding: 20px;">
-        <!-- Área de Logs (Oculta por padrão) -->
-        <section id="area-logs" style="display: none; background: #eee; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-            <h2>Auditoria de Sistema</h2>
-            <button onclick="fecharLogs()" style="margin-bottom: 10px;">Fechar Painel</button>
-            <pre id="conteudo-logs" style="background: #222; color: #0f0; padding: 10px; overflow-x: auto;"></pre>
-        </section>
+  <script>
+    let currentMode = 'login'; // login, cadastro, esqueci
 
-        <!-- Container onde os filmes vão aparecer -->
-        <section id="lista-filmes" style="display: flex; gap: 20px; flex-wrap: wrap;">
-            <!-- O JavaScript vai injetar os filmes aqui -->
-        </section>
-    </main>
+    function setMode(mode) {
+      currentMode = mode;
+      const nomeInput = document.getElementById('nome');
+      const senhaInput = document.getElementById('senha');
+      const title = document.getElementById('formTitle');
+      const btn = document.getElementById('submitBtn');
+      const toggle = document.getElementById('toggleText');
+      const forgot = document.getElementById('forgotText');
+      const msg = document.getElementById('msgErro');
+      msg.textContent = '';
 
-    <script>
-        // Assim que a página carregar, verifica o usuário e carrega os filmes
-        document.addEventListener("DOMContentLoaded", async () => {
-            verificarSessao();
-            carregarFilmes();
+      if (mode === 'login') {
+        nomeInput.style.display = 'none';
+        nomeInput.required = false;
+        senhaInput.style.display = 'block';
+        senhaInput.required = true;
+        title.textContent = 'Entrar';
+        btn.textContent = 'Entrar';
+        toggle.innerHTML = 'Não tem uma conta? <a onclick="setMode(\'cadastro\')">Cadastre-se</a>';
+        forgot.style.display = 'block';
+      } else if (mode === 'cadastro') {
+        nomeInput.style.display = 'block';
+        nomeInput.required = true;
+        senhaInput.style.display = 'block';
+        senhaInput.required = true;
+        title.textContent = 'Cadastrar';
+        btn.textContent = 'Cadastrar';
+        toggle.innerHTML = 'Já tem uma conta? <a onclick="setMode(\'login\')">Faça Login</a>';
+        forgot.style.display = 'none';
+      } else if (mode === 'esqueci') {
+        nomeInput.style.display = 'none';
+        nomeInput.required = false;
+        senhaInput.style.display = 'none';
+        senhaInput.required = false;
+        title.textContent = 'Recuperar Senha';
+        btn.textContent = 'Enviar Link por E-mail';
+        toggle.innerHTML = 'Lembrou a senha? <a onclick="setMode(\'login\')">Voltar ao Login</a>';
+        forgot.style.display = 'none';
+      }
+    }
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById('nome').value;
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const msg = document.getElementById('msgErro');
+
+      let endpoint = '/api/auth/login';
+      let body = { email, senha };
+
+      if (currentMode === 'cadastro') {
+        endpoint = '/api/auth/register';
+        body = { nome, email, senha };
+      } else if (currentMode === 'esqueci') {
+        endpoint = '/api/auth/forgot-password';
+        body = { email };
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
         });
+        const data = await res.json();
 
-        // Simulação de filmes para você não ficar com a tela em branco.
-        // Se você tiver uma rota no backend (ex: /api/filmes), substitua esta função por um fetch.
-        function carregarFilmes() {
-            const filmesTomHanks = [
-                { id: 13, titulo: "Forrest Gump", poster: "https://image.tmdb.org/t/p/w200/saHP97rTPS5eLmrLQEcANmKrsFl.jpg" },
-                { id: 862, titulo: "Toy Story", poster: "https://image.tmdb.org/t/p/w200/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg" },
-                { id: 8358, titulo: "Náufrago", poster: "https://image.tmdb.org/t/p/w200/1XddJGAI5W3hIq91w4hTfQO5OQh.jpg" }
-            ];
-
-            const container = document.getElementById('lista-filmes');
-            container.innerHTML = filmesTomHanks.map(filme => `
-                <div class="filme-card" style="border: 1px solid #ccc; padding: 10px; border-radius: 8px; width: 220px; text-align: center;">
-                    <img src="${filme.poster}" alt="${filme.titulo}" style="width: 100%; border-radius: 5px;">
-                    <h3>${filme.titulo}</h3>
-                    
-                    <button onclick="favoritar(${filme.id}, '${filme.titulo}', '${filme.poster}')" style="width: 100%; margin-bottom: 5px;">⭐ Favoritar</button>
-                    
-                    <div style="margin-top: 10px; text-align: left;">
-                        <input type="text" id="comentario-${filme.id}" placeholder="Escreva um comentário..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
-                        <button onclick="comentar(${filme.id})" style="width: 100%;">Comentar</button>
-                    </div>
-                </div>
-            `).join('');
+        if (res.ok) {
+          if (currentMode === 'login') {
+            window.location.href = 'index.html';
+          } else if (currentMode === 'cadastro') {
+            msg.style.color = 'green';
+            msg.textContent = 'Cadastrado com sucesso!';
+            setTimeout(() => setMode('login'), 1500);
+          } else {
+            msg.style.color = 'green';
+            msg.textContent = data.message || 'Verifique seu e-mail no Mailtrap.';
+          }
+        } else {
+          msg.style.color = '#e50914';
+          msg.textContent = data.error || 'Erro na requisição.';
         }
-
-        // Verifica se o usuário está logado e se é Admin
-        async function verificarSessao() {
-            try {
-                // Supondo que você tenha uma rota /api/me para ver quem está logado
-                const res = await fetch('/api/me', { credentials: 'include' });
-                if (!res.ok) {
-                    window.location.href = '/auth.html';
-                    return;
-                }
-                const usuario = await res.json();
-                
-                // Se for admin, mostra o botão de logs
-                if (usuario.role === 'admin') {
-                    document.getElementById('btn-admin').style.display = 'inline-block';
-                }
-            } catch (err) {
-                console.error("Erro ao verificar sessão");
-            }
-        }
-
-        // Funções de interação com o backend
-        async function favoritar(id, titulo, poster) {
-            await fetch('/api/favoritos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tmdb_movie_id: id, titulo: titulo, poster_path: poster }),
-                credentials: 'include'
-            });
-            alert('Ação registrada! Verifique os logs se for admin.');
-        }
-
-        async function comentar(filme_id) {
-            const input = document.getElementById(`comentario-${filme_id}`);
-            const texto = input.value;
-            if (!texto) return;
-
-            await fetch('/api/comentarios', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tmdb_movie_id: filme_id, texto: texto }),
-                credentials: 'include'
-            });
-            input.value = '';
-            alert('Comentário enviado!');
-        }
-
-        // Lógica de Auditoria (Apenas Admin)
-        async function carregarLogs() {
-            try {
-                const res = await fetch('/api/logs', { credentials: 'include' });
-                if (res.ok) {
-                    const logs = await res.json();
-                    document.getElementById('conteudo-logs').textContent = JSON.stringify(logs, null, 2);
-                    document.getElementById('area-logs').style.display = 'block';
-                } else {
-                    alert('Sem permissão para ver os logs.');
-                }
-            } catch (err) {
-                alert('Erro ao carregar logs.');
-            }
-        }
-
-        function fecharLogs() {
-            document.getElementById('area-logs').style.display = 'none';
-        }
-
-        async function sair() {
-            // Caso tenha uma rota de logout, chame-a aqui. Depois redirecione.
-            window.location.href = '/auth.html';
-        }
-    </script>
+      } catch (err) {
+        msg.style.color = '#e50914';
+        msg.textContent = 'Erro de conexão com o servidor.';
+      }
+    });
+  </script>
 </body>
 </html>
