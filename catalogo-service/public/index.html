@@ -2,8 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' https://image.tmdb.org https://via.placeholder.com data: blob: http: https:; connect-src 'self' http: https:;">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' https://image.tmdb.org https://via.placeholder.com http://localhost:9002 data: blob:; connect-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' https://image.tmdb.org https://via.placeholder.com http://localhost:9002 http://localhost:9003 http://localhost:9004 data: blob: http: https:; connect-src 'self' http: https:;">
   <title>Catálogo Tom Hanks</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -27,8 +26,9 @@
   </button>
 
   <!-- Avatar circular que serve de botão -->
-  <div class="profile-container" style="position: relative; display: inline-block; vertical-align: middle;">
-    <img id="avatar-img" src="https://via.placeholder.com/40" class="avatar-circle" alt="Perfil" onclick="toggleProfileMenu()" />
+  <div class="profile-container" style="position: relative; display: inline-block; vertical-align: middle; margin-left: 15px;">
+    <img id="avatar-img" src="https://via.placeholder.com/40" class="avatar-circle hidden" alt="Perfil" onclick="toggleProfileMenu()" />
+    <div id="avatar-initials" class="avatar-initials" onclick="toggleProfileMenu()"></div>
     
     <!-- Menu suspenso (dropdown) onde fica a opção de Editar e o botão Sair -->
     <div id="profile-dropdown" class="dropdown-hidden">
@@ -37,7 +37,19 @@
     </div>
   </div>
 </div>
+</div>
   </header>
+
+  <!-- Modal Editar Perfil -->
+  <div id="editProfileModal" class="modal hidden">
+    <div class="modal-content" style="padding: 30px; text-align: center;">
+      <h2>Editar Perfil</h2>
+      <p style="margin: 15px 0;">Faça o upload de uma nova foto de perfil.</p>
+      <input type="file" id="fotoPerfilInput" accept="image/*" style="margin-bottom: 20px;" />
+      <button onclick="salvarFotoPerfil()" style="background: #e50914; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Salvar Foto</button>
+      <button onclick="fecharProfileModal()" style="background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px;">Cancelar</button>
+    </div>
+  </div>
 
   <div id="toastMensagem" class="toast hidden"></div>
 
@@ -549,6 +561,6 @@
     iniciarCatalogo();
     
   </script>
-  <script> src="perfil.js" </script>
+  <script src="perfil.js"></script>
 </body>
 </html>

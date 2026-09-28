@@ -533,13 +533,30 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 }
 
 .avatar-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%; /* Faz a imagem ficar redonda */
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
     object-fit: cover;
     cursor: pointer;
     border: 2px solid #fff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.avatar-initials {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #e50914;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    text-transform: uppercase;
 }
 
 .dropdown-hidden, .modal-hidden {
@@ -584,10 +601,9 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
     margin-left: 15px;
 }
 
-/* Estilo da foto de perfil redonda */
 .avatar-circle {
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     object-fit: cover;
     cursor: pointer;
