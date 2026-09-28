@@ -69,3 +69,18 @@ services:
     restart: always
     networks:
       - app-network
+  minio:
+    image: minio/minio
+    container_name: minio-storage
+    ports:
+      - "9000:9000"
+      - "9001:9001" 
+    environment:
+      MINIO_ROOT_USER: ademiro
+      MINIO_ROOT_PASSWORD: szoboslai
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data: 
