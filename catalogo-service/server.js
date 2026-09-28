@@ -172,6 +172,28 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   }
 });
 
+// Alterar senha autenticado (usa sessão, sem token)
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+  const { novaSenha } = req.body;
+  if (!novaSenha || novaSenha.length < 6) {
+    return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+  }
+  const ip = getClientIp(req);
+  try {
+    const response = await axios.post(`${AUTH_SERVICE_URL}/change-password`, {
+      usuario_id: req.session.usuario.id,
+      novaSenha
+    }, {
+      headers: { 'x-forwarded-for': ip }
+    });
+    await registrarAuditoria(req.session.usuario.id, 'senha_alterada', 'Usuário alterou a própria senha', ip);
+    res.json(response.data);
+  } catch (err) {
+    res.status(err.response?.status || 500).json(err.response?.data || { error: 'Erro ao alterar senha.' });
+  }
+});
+
+
 // --- ROTAS DO CATÁLOGO TMDB ---
 app.get('/api/filmes', authMiddleware, async (req, res) => {
   try {

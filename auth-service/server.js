@@ -195,5 +195,22 @@ app.post('/reset-password', async (req, res) => {
   }
 });
 
+// Alterar Senha (chamado internamente pelo catalogo-service com usuario_id da sessão)
+app.post('/change-password', async (req, res) => {
+  // SEGURANÇA: usuario_id vem do catalogo-service (da sessão), não do body do usuário
+  const { usuario_id, novaSenha } = req.body;
+  if (!usuario_id || !novaSenha || novaSenha.length < 6) {
+    return res.status(400).json({ error: 'Dados inválidos.' });
+  }
+  try {
+    const hash = await bcrypt.hash(novaSenha, 12);
+    await pool.query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [hash, usuario_id]);
+    res.json({ message: 'Senha alterada com sucesso!' });
+  } catch (err) {
+    console.error('Erro no change-password:', err);
+    res.status(500).json({ error: 'Erro ao alterar senha.' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Auth Service rodando internamente na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Auth Service rodando internamente na porta ${PORT}`));

@@ -1,91 +1,273 @@
-function toggleProfileMenu() {
+// =========================================
+// PERFIL.JS - Gerenciamento de Perfil
+// =========================================
+
+// ---- DROPDOWN DE PERFIL ----
+
+function toggleProfileMenu(event) {
+  if (event) event.stopPropagation();
   const dropdown = document.getElementById('profile-dropdown');
-  if (dropdown.classList.contains('dropdown-hidden')) {
-    dropdown.classList.remove('dropdown-hidden');
-    dropdown.style.display = 'flex';
-  } else {
-    dropdown.classList.add('dropdown-hidden');
+  const chevron = document.getElementById('chevronIcon');
+  const isOpen = dropdown.style.display === 'block';
+  if (isOpen) {
     dropdown.style.display = 'none';
-  }
-}
-
-function openProfileModal() {
-  document.getElementById('editProfileModal').classList.remove('hidden');
-  toggleProfileMenu(); // Fecha o menu
-}
-
-function fecharProfileModal() {
-  document.getElementById('editProfileModal').classList.add('hidden');
-}
-
-function salvarFotoPerfil() {
-  const fileInput = document.getElementById('fotoPerfilInput');
-  const file = fileInput.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const base64Image = e.target.result;
-      // Salva no localStorage para simular o backend e exibe
-      localStorage.setItem('foto_perfil_' + usuarioLogado.id, base64Image);
-      usuarioLogado.foto_perfil = base64Image;
-      updateAvatar();
-      fecharProfileModal();
-      mostrarToast('Foto de perfil atualizada!');
-    };
-    reader.readAsDataURL(file);
+    chevron.style.transform = 'rotate(0deg)';
   } else {
-    mostrarToast('Selecione uma imagem primeiro.', 'erro');
+    dropdown.style.display = 'block';
+    chevron.style.transform = 'rotate(180deg)';
   }
 }
+
+function fecharDropdownPerfil() {
+  const dropdown = document.getElementById('profile-dropdown');
+  const chevron = document.getElementById('chevronIcon');
+  if (dropdown) dropdown.style.display = 'none';
+  if (chevron) chevron.style.transform = 'rotate(0deg)';
+}
+
+// ---- AVATAR ----
 
 function updateAvatar() {
   if (!usuarioLogado) return;
+
   const avatarImg = document.getElementById('avatar-img');
   const avatarInitials = document.getElementById('avatar-initials');
+  const dropdownAvatar = document.getElementById('dropdownAvatar');
+  const dropdownNome = document.getElementById('dropdownNome');
+  const dropdownEmail = document.getElementById('dropdownEmail');
 
-  // Verifica se há foto salva localmente (apenas para fallback temporário, o real virá do DB em breve)
+  // Atualiza info no header do dropdown
+  if (dropdownNome) dropdownNome.textContent = usuarioLogado.nome || '';
+  if (dropdownEmail) dropdownEmail.textContent = usuarioLogado.email || '';
+
+  // Verifica foto salva no localStorage
   const fotoSalva = localStorage.getItem('foto_perfil_' + usuarioLogado.id);
   if (fotoSalva && !usuarioLogado.foto_perfil) {
     usuarioLogado.foto_perfil = fotoSalva;
   }
 
+  // Calcula iniciais
+  const partes = (usuarioLogado.nome || 'US').trim().split(' ');
+  let iniciais = partes.length >= 2
+    ? partes[0][0] + partes[1][0]
+    : (partes[0].substring(0, 2) || 'US');
+  iniciais = iniciais.toUpperCase();
+
   if (usuarioLogado.foto_perfil) {
-    avatarImg.src = usuarioLogado.foto_perfil;
-    avatarImg.style.display = 'block';
-    avatarInitials.style.display = 'none';
+    // Mostra foto
+    if (avatarImg) { avatarImg.src = usuarioLogado.foto_perfil; avatarImg.style.display = 'block'; }
+    if (avatarInitials) avatarInitials.style.display = 'none';
+    if (dropdownAvatar) dropdownAvatar.style.backgroundImage = `url(${usuarioLogado.foto_perfil})`;
   } else {
-    // Pegar iniciais
-    const partes = (usuarioLogado.nome || '').trim().split(' ');
-    let iniciais = '';
-    if (partes.length >= 2) {
-      iniciais = partes[0][0] + partes[1][0];
-    } else if (partes.length === 1 && partes[0].length >= 2) {
-      iniciais = partes[0].substring(0, 2);
-    } else {
-      iniciais = 'US';
+    // Mostra iniciais
+    if (avatarImg) avatarImg.style.display = 'none';
+    if (avatarInitials) { avatarInitials.textContent = iniciais; avatarInitials.style.display = 'flex'; }
+    if (dropdownAvatar) {
+      dropdownAvatar.textContent = iniciais;
+      dropdownAvatar.style.backgroundImage = '';
     }
-    avatarInitials.textContent = iniciais.toUpperCase();
-    avatarInitials.style.display = 'flex';
-    avatarImg.style.display = 'none';
+  }
+
+  // Bio salva
+  const bioSalva = localStorage.getItem('bio_' + usuarioLogado.id);
+  if (bioSalva) usuarioLogado.bio = bioSalva;
+}
+
+// ---- MODAL: FOTO DE PERFIL ----
+
+function abrirFotoModal() {
+  fecharDropdownPerfil();
+  document.getElementById('fotoModal').classList.remove('hidden');
+}
+
+function fecharFotoModal() {
+  document.getElementById('fotoModal').classList.add('hidden');
+}
+
+function salvarFotoPerfil() {
+  const fileInput = document.getElementById('fotoPerfilInput');
+  const file = fileInput.files[0];
+  if (!file) { mostrarToast('Selecione uma imagem primeiro.', 'erro'); return; }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    localStorage.setItem('foto_perfil_' + usuarioLogado.id, base64);
+    usuarioLogado.foto_perfil = base64;
+    updateAvatar();
+    fecharFotoModal();
+    mostrarToast('Foto de perfil atualizada!');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---- MODAL: BIO ----
+
+function abrirBioModal() {
+  fecharDropdownPerfil();
+  const textarea = document.getElementById('bioTextarea');
+  const bioAtual = localStorage.getItem('bio_' + usuarioLogado.id) || '';
+  textarea.value = bioAtual;
+  document.getElementById('bioCharCount').textContent = bioAtual.length;
+  textarea.addEventListener('input', function() {
+    document.getElementById('bioCharCount').textContent = this.value.length;
+  });
+  document.getElementById('bioModal').classList.remove('hidden');
+}
+
+function fecharBioModal() {
+  document.getElementById('bioModal').classList.add('hidden');
+}
+
+function salvarBio() {
+  const bio = document.getElementById('bioTextarea').value.trim();
+  localStorage.setItem('bio_' + usuarioLogado.id, bio);
+  usuarioLogado.bio = bio;
+  fecharBioModal();
+  mostrarToast('Bio atualizada!');
+}
+
+// ---- MODAL: SENHA ----
+
+function abrirSenhaModal() {
+  fecharDropdownPerfil();
+  document.getElementById('senhaView').style.display = 'block';
+  document.getElementById('novaSenhaView').style.display = 'none';
+  document.getElementById('senhaAtualInput').value = '';
+  document.getElementById('senhaModal').classList.remove('hidden');
+}
+
+function fecharSenhaModal() {
+  document.getElementById('senhaModal').classList.add('hidden');
+}
+
+async function verificarSenhaAtual() {
+  const senhaDigitada = document.getElementById('senhaAtualInput').value;
+  if (!senhaDigitada) { mostrarToast('Digite sua senha atual.', 'erro'); return; }
+
+  try {
+    // Tenta logar com email + senha atual para verificar
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: usuarioLogado.email, senha: senhaDigitada })
+    });
+    if (res.ok) {
+      document.getElementById('senhaView').style.display = 'none';
+      document.getElementById('novaSenhaView').style.display = 'block';
+      document.getElementById('novaSenhaInput').value = '';
+      document.getElementById('confirmarSenhaInput').value = '';
+    } else {
+      mostrarToast('Senha atual incorreta!', 'erro');
+    }
+  } catch (e) {
+    mostrarToast('Erro ao verificar senha.', 'erro');
   }
 }
 
-// Interceptar o carregamento do usuário para atualizar o avatar
-const originalFetch = window.fetch;
+async function salvarNovaSenha() {
+  const nova = document.getElementById('novaSenhaInput').value;
+  const confirmar = document.getElementById('confirmarSenhaInput').value;
+
+  if (nova.length < 6) { mostrarToast('A nova senha deve ter no mínimo 6 caracteres.', 'erro'); return; }
+  if (nova !== confirmar) { mostrarToast('As senhas não conferem!', 'erro'); return; }
+
+  try {
+    // Usa o endpoint de reset via token — como não temos token aqui,
+    // chamamos a rota de reset com a nova senha (o backend valida pela sessão)
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ novaSenha: nova })
+    });
+    if (res.ok) {
+      mostrarToast('Senha alterada com sucesso!');
+      fecharSenhaModal();
+    } else {
+      const data = await res.json();
+      mostrarToast(data.error || 'Erro ao alterar senha.', 'erro');
+    }
+  } catch (e) {
+    mostrarToast('Erro de conexão.', 'erro');
+  }
+}
+
+// ---- PÁGINA DE PERFIL (tela de favoritos + bio) ----
+
+async function abrirPerfilPage() {
+  if (!usuarioLogado) return;
+
+  // Preenche dados da página de perfil
+  document.getElementById('profilePageNome').textContent = usuarioLogado.nome;
+  document.getElementById('profilePageEmail').textContent = usuarioLogado.email;
+
+  const bio = localStorage.getItem('bio_' + usuarioLogado.id) || 'Sem bio ainda.';
+  document.getElementById('profilePageBio').textContent = bio;
+
+  // Avatar na página de perfil
+  const avatar = document.getElementById('profilePageAvatar');
+  const foto = localStorage.getItem('foto_perfil_' + usuarioLogado.id) || usuarioLogado.foto_perfil;
+  if (foto) {
+    avatar.style.backgroundImage = `url(${foto})`;
+    avatar.textContent = '';
+  } else {
+    const partes = usuarioLogado.nome.trim().split(' ');
+    const iniciais = partes.length >= 2 ? partes[0][0] + partes[1][0] : partes[0].substring(0, 2);
+    avatar.textContent = iniciais.toUpperCase();
+    avatar.style.backgroundImage = '';
+  }
+
+  // Carrega favoritos
+  const container = document.getElementById('profilePageFavoritos');
+  container.innerHTML = '<p style="color:#888;">Carregando favoritos...</p>';
+  try {
+    const res = await fetch('/api/favoritos', { cache: 'no-store' });
+    const favoritos = await res.json();
+    container.innerHTML = '';
+    if (!favoritos || favoritos.length === 0) {
+      container.innerHTML = '<p style="color:#888; font-style:italic;">Nenhum filme favoritado ainda.</p>';
+    } else {
+      favoritos.forEach(f => {
+        const card = document.createElement('div');
+        card.className = 'filme-card';
+        card.innerHTML = `
+          <div class="poster-container">
+            <img src="https://image.tmdb.org/t/p/w500${f.poster_path}" alt="${f.titulo}">
+          </div>
+          <div class="card-info">
+            <h3>${f.titulo}</h3>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+  } catch (e) {
+    container.innerHTML = '<p style="color:#e50914;">Erro ao carregar favoritos.</p>';
+  }
+
+  // Troca de tela
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('profilePage').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function fecharPerfilPage() {
+  document.getElementById('profilePage').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+}
+
+// ---- INTERCEPTAR FETCH /api/auth/me PARA ATUALIZAR AVATAR ----
+const _originalFetch = window.fetch;
 window.fetch = async function(...args) {
-  const response = await originalFetch.apply(this, args);
-  if (args[0] === '/api/auth/me' || (args[0] && args[0].includes('/api/auth/me'))) {
-    // Clonamos a resposta para não atrapalhar quem chamou
+  const response = await _originalFetch.apply(this, args);
+  const url = typeof args[0] === 'string' ? args[0] : '';
+  if (url.includes('/api/auth/me')) {
     const clone = response.clone();
     clone.json().then(data => {
-      if (data && data.nome) {
-        // Atualiza a global se não estiver setada
-        if (typeof usuarioLogado !== 'undefined' && !usuarioLogado) {
-           usuarioLogado = data;
-        }
-        setTimeout(updateAvatar, 100); // Aguarda o iniciarCatalogo terminar
+      if (data && data.id) {
+        setTimeout(updateAvatar, 80);
       }
-    }).catch(e => {});
+    }).catch(() => {});
   }
   return response;
 };
