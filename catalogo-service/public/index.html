@@ -13,18 +13,29 @@
       <h1>Catálogo Tom Hanks</h1>
       
       <div class="search-container">
-        <i class="fas fa-search lupa-icon"></i>
-        <input type="text" id="searchInput" placeholder="Pesquisar filme..." onkeyup="pesquisarFilme()">
-      </div>
+  <i class="fas fa-search lupa-icon"></i>
+  <input type="text" id="searchInput" placeholder="Pesquisar filme..." onkeyup="pesquisarFilme()">
+</div>
 
-      <div class="user-menu">
-        <span id="userName"></span>
-        <button id="btnAdmin" class="btn-admin" style="display: none;" onclick="abrirAdminModal()">
-          <i class="fas fa-shield-alt"></i> Painel Admin
-        </button>
-        <button onclick="fazerLogout()" class="btn-sair">Sair</button>
-      </div>
+<div class="user-menu">
+  <span id="userName"></span>
+
+
+  <button id="btnAdmin" class="btn-admin" style="display: none;" onclick="abrirAdminModal()">
+    <i class="fas fa-shield-alt"></i> Painel Admin
+  </button>
+
+  <!-- Avatar circular que serve de botão -->
+  <div class="profile-container" style="position: relative; display: inline-block; vertical-align: middle;">
+    <img id="avatar-img" src="https://via.placeholder.com/40" class="avatar-circle" alt="Perfil" onclick="toggleProfileMenu()" />
+    
+    <!-- Menu suspenso (dropdown) onde fica a opção de Editar e o botão Sair -->
+    <div id="profile-dropdown" class="dropdown-hidden">
+      <button type="button" onclick="openProfileModal()">Editar Perfil</button>
+      <button type="button" onclick="fazerLogout()" class="btn-sair">Sair</button>
     </div>
+  </div>
+</div>
   </header>
 
   <div id="toastMensagem" class="toast hidden"></div>
@@ -535,6 +546,8 @@
     }
 
     iniciarCatalogo();
+    
   </script>
+  <script> src="perfil.js" </script>
 </body>
 </html>
