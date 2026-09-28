@@ -43,28 +43,30 @@ function updateAvatar() {
   const avatarImg = document.getElementById('avatar-img');
   const avatarInitials = document.getElementById('avatar-initials');
 
-  // Verifica se há foto salva localmente
+  // Verifica se há foto salva localmente (apenas para fallback temporário, o real virá do DB em breve)
   const fotoSalva = localStorage.getItem('foto_perfil_' + usuarioLogado.id);
-  if (fotoSalva) {
+  if (fotoSalva && !usuarioLogado.foto_perfil) {
     usuarioLogado.foto_perfil = fotoSalva;
   }
 
   if (usuarioLogado.foto_perfil) {
     avatarImg.src = usuarioLogado.foto_perfil;
-    avatarImg.classList.remove('hidden');
-    avatarInitials.classList.add('hidden');
+    avatarImg.style.display = 'block';
+    avatarInitials.style.display = 'none';
   } else {
     // Pegar iniciais
-    const partes = usuarioLogado.nome.trim().split(' ');
+    const partes = (usuarioLogado.nome || '').trim().split(' ');
     let iniciais = '';
     if (partes.length >= 2) {
       iniciais = partes[0][0] + partes[1][0];
-    } else if (partes.length === 1) {
+    } else if (partes.length === 1 && partes[0].length >= 2) {
       iniciais = partes[0].substring(0, 2);
+    } else {
+      iniciais = 'US';
     }
     avatarInitials.textContent = iniciais.toUpperCase();
-    avatarInitials.classList.remove('hidden');
-    avatarImg.classList.add('hidden');
+    avatarInitials.style.display = 'flex';
+    avatarImg.style.display = 'none';
   }
 }
 
