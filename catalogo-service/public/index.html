@@ -49,7 +49,7 @@
 
         <!-- Avatar + seta dropdown -->
         <div class="profile-trigger-area" id="profileTrigger">
-          <div class="avatar-wrapper" onclick="abrirPerfilPage()">
+          <div class="avatar-wrapper" onclick="abrirPerfilPage()" title="Seu perfil">
             <img id="avatar-img" src="" class="avatar-circle" style="display:none;" alt="Perfil" />
             <div id="avatar-initials" class="avatar-initials"></div>
           </div>
@@ -270,7 +270,10 @@
         if (!userRes.ok) return window.location.href = 'auth.html';
         
         usuarioLogado = await userRes.json();
-        document.getElementById('userName').textContent = `Olá, ${usuarioLogado.nome}`;
+
+        // Exibe iniciais/avatar assim que o usuário é carregado
+        // Usa setTimeout para garantir que perfil.js já foi carregado
+        setTimeout(() => { if (typeof updateAvatar === 'function') updateAvatar(); }, 50);
 
         // Se for admin, exibe o botão de acesso ao Painel Admin
         if (usuarioLogado.role === 'admin') {
