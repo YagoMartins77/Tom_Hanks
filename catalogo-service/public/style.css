@@ -522,4 +522,113 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
 .btn-del-comment-admin:hover {
   background-color: #e74c3c;
   color: white;
-}
+}
+
+/* Posicionamento do Avatar no canto superior direito */
+.profile-container {
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    z-index: 1000;
+}
+
+.avatar-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%; /* Faz a imagem ficar redonda */
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.dropdown-hidden, .modal-hidden {
+    display: none;
+}
+
+#profile-dropdown {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#profile-dropdown button {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+}
+
+#profile-dropdown button:hover { background: #f1f1f1; }
+
+.modal-content {
+    /* Estilos básicos de modal centralizado no meio da tela */
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; padding: 20px; border-radius: 10px; z-index: 2000;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    width: 300px; display: flex; flex-direction: column;
+}
+
+/* Posicionamento do container da foto */
+.profile-container {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 15px;
+}
+
+/* Estilo da foto de perfil redonda */
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+/* Esconde o menu por padrão */
+.dropdown-hidden {
+    display: none !important;
+}
+
+/* Estilo do menu suspenso (dropdown) */
+#profile-dropdown {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background: #141414; /* Cor escura para combinar com o tema */
+    border: 1px solid #333;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    flex-direction: column;
+    min-width: 150px;
+    z-index: 1000;
+}
+
+/* Quando o JS muda para display: flex, ele sobrepõe o hidden */
+#profile-dropdown[style*="display: flex"] {
+    display: flex !important;
+}
+
+/* Botões dentro do menu */
+#profile-dropdown button {
+    padding: 10px 15px;
+    border: none;
+    background: transparent;
+    color: white;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+}
+
+#profile-dropdown button:hover {
+    background: #333;
+}
