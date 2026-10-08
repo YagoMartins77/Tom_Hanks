@@ -37,8 +37,6 @@ Atualmente, nosso sistema utiliza o **Padrão A (Enforcement Centralizado)**. To
 
 Se fôssemos mudar para o **Padrão B (Claims no JWT)**, o papel (`role`) do usuário viria embutido dentro de um token assinado. A principal mudança no código seria que o serviço não precisaria mais ir até o banco ou fazer uma chamada externa para validar a permissão; ele apenas decodificaria o token localmente e decidiria sozinho. Isso deixaria o sistema mais rápido, porém, se o papel de um usuário fosse alterado no banco, a mudança não seria imediata, tendo efeito apenas quando o token expirasse e fosse renovado.
 
-<<<<<<< HEAD
-=======
 ---
 
 ## Atividade: Logs e Auditoria — Quem fez o quê, e quando
