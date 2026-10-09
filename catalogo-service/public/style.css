@@ -787,4 +787,253 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
   margin-bottom: 8px;
 }
 
+/* =========================================
+   PREMIUM — BOTÃO HEADER
+   ========================================= */
+.btn-premium {
+  background: linear-gradient(135deg, #b8860b, #ffc107, #b8860b);
+  background-size: 200% 200%;
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: 0.3px;
+  animation: shimmerGold 3s ease infinite;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px rgba(255, 193, 7, 0.35);
+}
+.btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(255, 193, 7, 0.6);
+}
+.btn-premium-ativo {
+  background: linear-gradient(135deg, #1a1a1a, #2a2a2a) !important;
+  color: #ffc107 !important;
+  border: 1px solid #ffc107 !important;
+  animation: none !important;
+}
+@keyframes shimmerGold {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* =========================================
+   PREMIUM — BADGE VIP
+   ========================================= */
+.badge-vip {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #000;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+.badge-premium-mini {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #000;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* =========================================
+   PREMIUM — COMENTÁRIO VIP (moldura dourada)
+   ========================================= */
+.comentario-vip {
+  background: linear-gradient(135deg, #1a1500 0%, #221e00 60%, #1a1500 100%) !important;
+  border: 1.5px solid #ffc107 !important;
+  box-shadow: 0 0 10px rgba(255,193,7,0.18), inset 0 0 12px rgba(255,193,7,0.04);
+  position: relative;
+}
+.comentario-vip::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: -1px; right: -1px; bottom: -1px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffd700, transparent, #ffd700);
+  opacity: 0.12;
+  pointer-events: none;
+}
+.comentario-vip strong { color: #ffc107 !important; }
+
+/* =========================================
+   PREMIUM — MODAL
+   ========================================= */
+.premium-modal-content {
+  position: relative;
+  background: #0f0f0f !important;
+  border: 1px solid #2a2408 !important;
+  max-width: 560px !important;
+  overflow: hidden;
+}
+.premium-modal-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top center, rgba(255,193,7,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.premium-modal-body {
+  position: relative;
+  z-index: 1;
+  padding: 40px 36px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.premium-fechar {
+  position: absolute !important;
+  top: 16px;
+  right: 20px;
+}
+.premium-crown-wrap { margin-bottom: 16px; }
+.premium-crown-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b8860b, #ffd700, #b8860b);
+  background-size: 200% 200%;
+  animation: shimmerGold 3s ease infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #000;
+  box-shadow: 0 0 24px rgba(255,193,7,0.5);
+}
+.premium-title { font-size: 1.9rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+.premium-gold { color: #ffc107; }
+.premium-subtitle { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+.premium-features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+.premium-feature {
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: #ccc;
+  text-align: left;
+  transition: border-color 0.2s;
+}
+.premium-feature:hover { border-color: #ffc107; }
+.premium-feature i { font-size: 1.1rem; flex-shrink: 0; }
+.premium-price-box {
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+.premium-price { font-size: 2.2rem; font-weight: 900; color: #ffc107; }
+.premium-period { font-size: 1rem; color: #888; }
+.premium-ja-ativo {
+  color: #2ecc71;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-assinar-premium {
+  width: 100%;
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #000;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  letter-spacing: 0.3px;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  margin-bottom: 12px;
+}
+.btn-assinar-premium:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(255,193,7,0.5);
+}
+.btn-assinar-premium:disabled { opacity: 0.65; cursor: not-allowed; }
+.premium-seguranca { color: #555; font-size: 0.76rem; display: flex; align-items: center; gap: 6px; }
+
+/* =========================================
+   AUDIO — SEÇÃO DE CRÍTICA VIP
+   ========================================= */
+.audio-section {
+  background: linear-gradient(135deg, #0d0d00, #1a1600);
+  border: 1px solid rgba(255,193,7,0.25);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.audio-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #e0c060;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+.audio-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-audio {
+  background: #1e1e1e;
+  border: 1px solid #444;
+  color: #ddd;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-audio:hover { background: #2a2a2a; border-color: #ffc107; color: #ffc107; }
+.btn-audio-send { background: #1a3a10; border-color: #2ecc71; color: #2ecc71; }
+.btn-audio-send:hover { background: #2ecc71; color: #000; }
+.audio-comment-player { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* =========================================
+   TOAST PREMIUM (cor dourada)
+   ========================================= */
+.toast.premium {
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  color: #000;
+  font-weight: 800;
+}
+
+/* =========================================
+   AUDIT LOG — badge premium
+   ========================================= */
+.badge-premium { background: rgba(255,193,7,0.2); color: #ffc107; border: 1px solid rgba(255,193,7,0.4); }
+
 

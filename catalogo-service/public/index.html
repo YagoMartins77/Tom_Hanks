@@ -43,6 +43,11 @@
       </div>
 
       <div class="user-menu">
+        <!-- Botão Premium -->
+        <button id="btnPremium" class="btn-premium" onclick="abrirPremiumModal()" title="Assine o Plano Premium">
+          <i class="fas fa-crown"></i> Premium
+        </button>
+
         <button id="btnAdmin" class="btn-admin" style="display: none;" onclick="abrirAdminModal()">
           <i class="fas fa-shield-alt"></i> Painel Admin
         </button>
@@ -64,12 +69,14 @@
               <div>
                 <strong id="dropdownNome"></strong>
                 <p id="dropdownEmail" style="color:#aaa; font-size:0.8rem; margin:0;"></p>
+                <span id="dropdownPremiumBadge" style="display:none;" class="badge-premium-mini">⭐ Premium</span>
               </div>
             </div>
             <hr style="border-color:#333; margin:8px 0;">
             <button class="dropdown-item" onclick="abrirFotoModal()"><i class="fas fa-camera"></i> Alterar foto de perfil</button>
             <button class="dropdown-item" onclick="abrirBioModal()"><i class="fas fa-pen"></i> Editar bio</button>
             <button class="dropdown-item" onclick="abrirSenhaModal()"><i class="fas fa-lock"></i> Senha</button>
+            <button id="btnBannerDropdown" class="dropdown-item" style="display:none;" onclick="abrirBannerModal()"><i class="fas fa-image"></i> Banner Premium</button>
             <hr style="border-color:#333; margin:8px 0;">
             <button class="dropdown-item btn-sair-item" onclick="fazerLogout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
           </div>
@@ -85,11 +92,12 @@
         <h2>Alterar Foto de Perfil</h2>
         <button class="fechar-modal" onclick="fecharFotoModal()">×</button>
       </div>
-      <p style="color:#aaa; margin:15px 0;">Selecione uma imagem do seu dispositivo.</p>
+      <p id="fotoLimitInfo" style="color:#aaa; margin:15px 0;">Selecione uma imagem (máx. <strong id="fotoLimitTexto">1 MB</strong>).</p>
+      <p style="color:#888; font-size:0.82rem; margin-bottom:12px;">Usuários Premium podem enviar até 10 MB e imagens em alta definição.</p>
       <input type="file" id="fotoPerfilInput" accept="image/*" style="margin-bottom:20px; color:white;" />
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button class="btn-cancel-modal" onclick="fecharFotoModal()">Cancelar</button>
-        <button class="btn-confirm-modal" onclick="salvarFotoPerfil()">Salvar Foto</button>
+        <button class="btn-confirm-modal" onclick="salvarFotoPerfilMinio()">Salvar Foto</button>
       </div>
     </div>
   </div>
@@ -147,6 +155,85 @@
   </main>
   </div><!-- fim #mainContent -->
 
+  <!-- MODAL PREMIUM -->
+  <div id="premiumModal" class="modal hidden">
+    <div class="modal-content premium-modal-content">
+      <div class="premium-modal-bg"></div>
+      <div class="premium-modal-body">
+        <button class="fechar-modal premium-fechar" onclick="fecharPremiumModal()">×</button>
+
+        <div class="premium-crown-wrap">
+          <div class="premium-crown-icon">
+            <i class="fas fa-crown"></i>
+          </div>
+        </div>
+
+        <h2 class="premium-title">Plano <span class="premium-gold">Premium</span></h2>
+        <p class="premium-subtitle">Eleve a sua experiência no Catálogo Tom Hanks</p>
+
+        <div class="premium-features-grid">
+          <div class="premium-feature">
+            <i class="fas fa-microphone" style="color:#ffc107;"></i>
+            <span>Críticas em <strong>áudio</strong> (MinIO)</span>
+          </div>
+          <div class="premium-feature">
+            <i class="fas fa-image" style="color:#7c3aed;"></i>
+            <span>Banner de perfil em alta definição</span>
+          </div>
+          <div class="premium-feature">
+            <i class="fas fa-upload" style="color:#10b981;"></i>
+            <span>Avatar até <strong>10 MB</strong> (vs 1 MB)</span>
+          </div>
+          <div class="premium-feature">
+            <i class="fas fa-star" style="color:#ffc107;"></i>
+            <span>Badge <strong>VIP</strong> dourado nos comentários</span>
+          </div>
+          <div class="premium-feature">
+            <i class="fas fa-thumbtack" style="color:#e50914;"></i>
+            <span>Comentários fixados no <strong>topo</strong></span>
+          </div>
+          <div class="premium-feature">
+            <i class="fas fa-paint-brush" style="color:#3b82f6;"></i>
+            <span>Moldura dourada nos comentários</span>
+          </div>
+        </div>
+
+        <div class="premium-price-box">
+          <span class="premium-price">R$ 9,90</span>
+          <span class="premium-period">/mês</span>
+          <p style="font-size:0.78rem; color:#888; margin-top:4px;">Cobrado mensalmente. Cancele a qualquer hora.</p>
+          <p style="font-size:0.75rem; color:#555; margin-top:2px;">Modo de teste — cartão 4242 4242 4242 4242 funciona.</p>
+        </div>
+
+        <div id="premiumJaAtivo" style="display:none; text-align:center; margin-top:10px;">
+          <p class="premium-ja-ativo"><i class="fas fa-check-circle"></i> Você já é Premium! Aproveite todos os benefícios.</p>
+        </div>
+
+        <button id="btnAssinarPremium" class="btn-assinar-premium" onclick="iniciarCheckoutStripe()">
+          <i class="fas fa-bolt"></i> Assinar Agora com Stripe
+        </button>
+
+        <p class="premium-seguranca"><i class="fas fa-lock"></i> Pagamento seguro via Stripe. Nunca armazenamos dados de cartão.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BANNER PREMIUM -->
+  <div id="bannerModal" class="modal hidden">
+    <div class="modal-content modal-pequeno">
+      <div class="modal-header-top">
+        <h2><i class="fas fa-image" style="color:#ffc107;"></i> Banner de Perfil <span class="badge-vip">VIP</span></h2>
+        <button class="fechar-modal" onclick="fecharBannerModal()">×</button>
+      </div>
+      <p style="color:#aaa; margin:15px 0;">Escolha uma imagem em alta definição (máx. 10 MB) para o seu banner.</p>
+      <input type="file" id="bannerInput" accept="image/*" style="margin-bottom:20px; color:white;" />
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn-cancel-modal" onclick="fecharBannerModal()">Cancelar</button>
+        <button class="btn-confirm-modal" onclick="salvarBanner()">Salvar Banner</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE DETALHES DO FILME -->
   <div id="filmeModal" class="modal hidden">
     <div class="modal-content">
@@ -168,7 +255,29 @@
           
           <h3>Comentários</h3>
           <div id="listaComentarios" class="comentarios-container"></div>
-          
+
+          <!-- Seção de áudio (Premium) -->
+          <div id="secaoAudio" class="audio-section" style="display:none;">
+            <div class="audio-section-header">
+              <i class="fas fa-microphone" style="color:#ffc107;"></i>
+              <span>Crítica em Áudio <span class="badge-vip">VIP</span></span>
+            </div>
+            <div class="audio-controls">
+              <button id="btnGravar" class="btn-audio" onclick="iniciarGravacao()">
+                <i class="fas fa-circle" style="color:#e50914;"></i> Gravar
+              </button>
+              <button id="btnPararGravar" class="btn-audio" onclick="pararGravacao()" style="display:none;">
+                <i class="fas fa-stop"></i> Parar
+              </button>
+              <audio id="audioPreview" controls style="display:none; max-width:100%; margin-top:8px;"></audio>
+              <button id="btnEnviarAudio" class="btn-audio btn-audio-send" onclick="enviarAudio()" style="display:none;">
+                <i class="fas fa-paper-plane"></i> Enviar Crítica
+              </button>
+            </div>
+            <p style="color:#666; font-size:0.78rem; margin-top:6px;">Ou envie um arquivo de áudio:</p>
+            <input type="file" id="audioFileInput" accept="audio/*" onchange="previewAudioFile()" style="color:#aaa; font-size:0.82rem;">
+          </div>
+
           <div class="comentario-form">
             <input type="text" id="novoComentario" placeholder="Escreva um comentário...">
             <button onclick="adicionarComentario()">Comentar</button>
@@ -268,17 +377,68 @@
       try {
         const userRes = await fetch('/api/auth/me', { cache: 'no-store' });
         if (!userRes.ok) return window.location.href = 'auth.html';
-        
+
         usuarioLogado = await userRes.json();
 
-        // Exibe iniciais/avatar assim que o usuário é carregado
-        // Usa setTimeout para garantir que perfil.js já foi carregado
+        // Exibe iniciais/avatar
         setTimeout(() => { if (typeof updateAvatar === 'function') updateAvatar(); }, 50);
 
-        // Se for admin, exibe o botão de acesso ao Painel Admin
+        // Gestão de UI por role/premium
         if (usuarioLogado.role === 'admin') {
           const btnAdmin = document.getElementById('btnAdmin');
           if (btnAdmin) btnAdmin.style.display = 'inline-flex';
+        }
+
+        // Botão Premium: esconder se já for premium, mostrar badge no dropdown
+        if (usuarioLogado.premium) {
+          const btnPremium = document.getElementById('btnPremium');
+          if (btnPremium) {
+            btnPremium.innerHTML = '<i class="fas fa-crown"></i> Premium <span style="font-size:0.7em;color:#ffc107;">✓</span>';
+            btnPremium.classList.add('btn-premium-ativo');
+          }
+          const badge = document.getElementById('dropdownPremiumBadge');
+          if (badge) badge.style.display = 'inline-block';
+          const btnBanner = document.getElementById('btnBannerDropdown');
+          if (btnBanner) btnBanner.style.display = 'flex';
+          // Atualiza info de limite de foto
+          const fotoLimite = document.getElementById('fotoLimitTexto');
+          if (fotoLimite) fotoLimite.textContent = '10 MB';
+        }
+
+        // Verifica parâmetro na URL (retorno do Stripe)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('premium') === 'sucesso') {
+          const sessionId = params.get('session_id');
+          if (sessionId) {
+            try {
+              await fetch(`/api/stripe/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+              // Recarregar dados atualizados do usuário
+              const freshRes = await fetch('/api/auth/me');
+              if (freshRes.ok) {
+                usuarioLogado = await freshRes.json();
+                if (usuarioLogado.premium) {
+                  const btnPremium = document.getElementById('btnPremium');
+                  if (btnPremium) {
+                    btnPremium.innerHTML = '<i class="fas fa-crown"></i> Premium <span style="font-size:0.7em;color:#ffc107;">✓</span>';
+                    btnPremium.classList.add('btn-premium-ativo');
+                  }
+                  const badge = document.getElementById('dropdownPremiumBadge');
+                  if (badge) badge.style.display = 'inline-block';
+                  const btnBanner = document.getElementById('btnBannerDropdown');
+                  if (btnBanner) btnBanner.style.display = 'flex';
+                  const fotoLimite = document.getElementById('fotoLimitTexto');
+                  if (fotoLimite) fotoLimite.textContent = '10 MB';
+                }
+              }
+            } catch (e) {
+              console.error('Erro ao verificar sessão do Stripe:', e);
+            }
+          }
+          setTimeout(() => mostrarToast('🌟 Bem-vindo ao Premium! Seus benefícios estão ativos.', 'premium'), 500);
+          window.history.replaceState({}, '', window.location.pathname);
+        } else if (params.get('premium') === 'cancelado') {
+          setTimeout(() => mostrarToast('Assinatura cancelada. Tente novamente quando quiser.', 'erro'), 500);
+          window.history.replaceState({}, '', window.location.pathname);
         }
 
         const favRes = await fetch('/api/favoritos', { cache: 'no-store' });
@@ -335,7 +495,7 @@
       document.getElementById('modalTitulo').textContent = filme.title;
       document.getElementById('modalSinopse').textContent = filme.overview || 'Sinopse não disponível.';
       document.getElementById('modalPoster').src = `https://image.tmdb.org/t/p/w500${filme.poster_path}`;
-      
+
       const modalEstrela = document.getElementById('modalEstrela');
       modalEstrela.onclick = () => toggleFavoritoModal(filme.id, filme.title, filme.poster_path);
 
@@ -344,10 +504,22 @@
       } else {
         modalEstrela.className = 'far fa-star fav-inactive estrela-btn-modal';
       }
-      
+
       document.getElementById('filmeModal').classList.remove('hidden');
       document.getElementById('novoComentario').value = '';
-      
+
+      // Seção de áudio: exibe apenas para premium
+      const secaoAudio = document.getElementById('secaoAudio');
+      if (secaoAudio) secaoAudio.style.display = (usuarioLogado && usuarioLogado.premium) ? 'block' : 'none';
+      // Limpa pré-visualização de áudio
+      audioBlob = null;
+      const audioPreview = document.getElementById('audioPreview');
+      if (audioPreview) { audioPreview.src = ''; audioPreview.style.display = 'none'; }
+      const btnEnviarAudio = document.getElementById('btnEnviarAudio');
+      if (btnEnviarAudio) btnEnviarAudio.style.display = 'none';
+      const audioFileInput = document.getElementById('audioFileInput');
+      if (audioFileInput) audioFileInput.value = '';
+
       carregarComentarios(filme.id);
     }
 
@@ -407,13 +579,13 @@
     async function carregarComentarios(movieId) {
       const container = document.getElementById('listaComentarios');
       container.innerHTML = 'Carregando...';
-      
+
       try {
         const res = await fetch(`/api/comentarios/${movieId}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Erro');
-        
+
         const comentarios = await res.json();
-        
+
         container.innerHTML = '';
         if (!Array.isArray(comentarios) || comentarios.length === 0) {
           container.innerHTML = '<p class="sem-comentarios">Seja o primeiro a comentar!</p>';
@@ -422,26 +594,44 @@
 
         comentarios.forEach(c => {
           const div = document.createElement('div');
-          div.className = 'comentario-item';
-          
+          const isPremiumUser = c.is_premium == 1;
+
+          // Classe premium com moldura dourada
+          div.className = isPremiumUser ? 'comentario-item comentario-vip' : 'comentario-item';
+
           let lixeiraHtml = '';
           if (usuarioLogado && (c.usuario_id === usuarioLogado.id || usuarioLogado.role === 'admin')) {
             lixeiraHtml = `<button class="btn-apagar-comentario" onclick="apagarComentario(${c.id})" title="Apagar comentário"><i class="fas fa-trash"></i> Apagar</button>`;
           }
 
           let infoAutor = `<strong>${c.nome}</strong>`;
+          if (isPremiumUser) {
+            infoAutor += ' <span class="badge-vip"><i class="fas fa-crown"></i> VIP</span>';
+          }
           if (usuarioLogado && usuarioLogado.role === 'admin') {
             infoAutor += ` <span style="font-size: 0.85em; color: #a3a3a3;">(${c.email})</span>`;
           }
 
+          // Conteúdo: texto ou player de áudio
+          let conteudoHtml = '';
+          if (c.audio_url) {
+            conteudoHtml = `
+              <div class="audio-comment-player">
+                <i class="fas fa-microphone" style="color:#ffc107; margin-right:6px;"></i>
+                <audio controls src="${c.audio_url}" style="max-width:100%; vertical-align:middle;"></audio>
+              </div>`;
+          } else {
+            conteudoHtml = `<span>${c.texto}</span>`;
+          }
+
           div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; align-items:center;">
               <div>${infoAutor}</div>
               ${lixeiraHtml}
             </div>
-            <span>${c.texto}</span>
+            ${conteudoHtml}
           `;
-          
+
           container.appendChild(div);
         });
       } catch (err) {
@@ -626,26 +816,20 @@
     // Helper para gerar Badges coloridos
     function obterBadgeAcao(acao) {
       switch (acao) {
-        case 'login_sucesso':
-          return '<span class="log-badge badge-login-ok"><i class="fas fa-sign-in-alt"></i> Login OK</span>';
-        case 'login_falha':
-          return '<span class="log-badge badge-login-fail"><i class="fas fa-times-circle"></i> Login Falha</span>';
-        case 'logout':
-          return '<span class="log-badge badge-logout"><i class="fas fa-sign-out-alt"></i> Logout</span>';
-        case 'favoritar_filme':
-          return '<span class="log-badge badge-fav"><i class="fas fa-star"></i> Favoritou</span>';
-        case 'desfavoritar_filme':
-          return '<span class="log-badge badge-unfav"><i class="far fa-star"></i> Desfavoritou</span>';
-        case 'criar_comentario':
-          return '<span class="log-badge badge-comment"><i class="fas fa-comment"></i> Comentou</span>';
-        case 'deletar_comentario':
-          return '<span class="log-badge badge-delete"><i class="fas fa-trash"></i> Apagou Comentário</span>';
-        case 'tentativa_negada_403':
-          return '<span class="log-badge badge-403"><i class="fas fa-shield-virus"></i> 403 Bloqueado</span>';
-        case 'deletar_log':
-          return '<span class="log-badge badge-delete"><i class="fas fa-eraser"></i> Apagou Log</span>';
-        default:
-          return `<span class="log-badge badge-default">${acao}</span>`;
+        case 'login_sucesso':     return '<span class="log-badge badge-login-ok"><i class="fas fa-sign-in-alt"></i> Login OK</span>';
+        case 'login_falha':       return '<span class="log-badge badge-login-fail"><i class="fas fa-times-circle"></i> Login Falha</span>';
+        case 'logout':            return '<span class="log-badge badge-logout"><i class="fas fa-sign-out-alt"></i> Logout</span>';
+        case 'favoritar_filme':   return '<span class="log-badge badge-fav"><i class="fas fa-star"></i> Favoritou</span>';
+        case 'desfavoritar_filme':return '<span class="log-badge badge-unfav"><i class="far fa-star"></i> Desfavoritou</span>';
+        case 'criar_comentario':  return '<span class="log-badge badge-comment"><i class="fas fa-comment"></i> Comentou</span>';
+        case 'criar_comentario_audio': return '<span class="log-badge badge-premium"><i class="fas fa-microphone"></i> Áudio VIP</span>';
+        case 'deletar_comentario':return '<span class="log-badge badge-delete"><i class="fas fa-trash"></i> Apagou Comentário</span>';
+        case 'tentativa_negada_403': return '<span class="log-badge badge-403"><i class="fas fa-shield-virus"></i> 403 Bloqueado</span>';
+        case 'deletar_log':       return '<span class="log-badge badge-delete"><i class="fas fa-eraser"></i> Apagou Log</span>';
+        case 'upgrade_premium':   return '<span class="log-badge badge-premium"><i class="fas fa-crown"></i> Upgrade Premium</span>';
+        case 'upload_avatar':     return '<span class="log-badge badge-comment"><i class="fas fa-image"></i> Upload Avatar</span>';
+        case 'upload_banner':     return '<span class="log-badge badge-premium"><i class="fas fa-image"></i> Upload Banner</span>';
+        default: return `<span class="log-badge badge-default">${acao}</span>`;
       }
     }
 
@@ -653,9 +837,7 @@
       const toast = document.getElementById('toastMensagem');
       toast.textContent = mensagem;
       toast.className = `toast show ${tipo}`;
-      setTimeout(() => {
-        toast.className = 'toast hidden';
-      }, 3000);
+      setTimeout(() => { toast.className = 'toast hidden'; }, 4000);
     }
 
     async function fazerLogout() {
@@ -663,8 +845,190 @@
       window.location.href = 'auth.html';
     }
 
+    // =========================================
+    // PREMIUM MODAL
+    // =========================================
+    function abrirPremiumModal() {
+      const modal = document.getElementById('premiumModal');
+      modal.classList.remove('hidden');
+      // Se já é premium, esconde botão de assinar
+      if (usuarioLogado && usuarioLogado.premium) {
+        document.getElementById('premiumJaAtivo').style.display = 'block';
+        document.getElementById('btnAssinarPremium').style.display = 'none';
+      } else {
+        document.getElementById('premiumJaAtivo').style.display = 'none';
+        document.getElementById('btnAssinarPremium').style.display = 'flex';
+      }
+    }
+
+    function fecharPremiumModal() {
+      document.getElementById('premiumModal').classList.add('hidden');
+    }
+
+    async function iniciarCheckoutStripe() {
+      if (!usuarioLogado) {
+        mostrarToast('Faça login primeiro para assinar o VIP Premium.', 'erro');
+        fecharPremiumModal();
+        abrirModalAuth();
+        return;
+      }
+      const btn = document.getElementById('btnAssinarPremium');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecionando para o Stripe...';
+      try {
+        const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          mostrarToast(data.error || 'Erro ao iniciar checkout.', 'erro');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-bolt"></i> Assinar Agora com Stripe';
+        }
+      } catch (e) {
+        mostrarToast('Erro de conexão com o Stripe.', 'erro');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-bolt"></i> Assinar Agora com Stripe';
+      }
+    }
+
+    // =========================================
+    // AUDIO: GRAVAÇÃO E UPLOAD
+    // =========================================
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioBlob = null;
+
+    async function iniciarGravacao() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(audioBlob);
+          const preview = document.getElementById('audioPreview');
+          preview.src = url;
+          preview.style.display = 'block';
+          document.getElementById('btnEnviarAudio').style.display = 'inline-flex';
+          stream.getTracks().forEach(t => t.stop());
+        };
+        mediaRecorder.start();
+        document.getElementById('btnGravar').style.display = 'none';
+        document.getElementById('btnPararGravar').style.display = 'inline-flex';
+        mostrarToast('Gravando... clique em Parar quando terminar.');
+      } catch (e) {
+        mostrarToast('Não foi possível acessar o microfone.', 'erro');
+      }
+    }
+
+    function pararGravacao() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      document.getElementById('btnGravar').style.display = 'inline-flex';
+      document.getElementById('btnPararGravar').style.display = 'none';
+    }
+
+    function previewAudioFile() {
+      const file = document.getElementById('audioFileInput').files[0];
+      if (!file) return;
+      audioBlob = file;
+      const url = URL.createObjectURL(file);
+      const preview = document.getElementById('audioPreview');
+      preview.src = url;
+      preview.style.display = 'block';
+      document.getElementById('btnEnviarAudio').style.display = 'inline-flex';
+    }
+
+    async function enviarAudio() {
+      if (!audioBlob || !filmeAtualExpandido) return;
+      const btn = document.getElementById('btnEnviarAudio');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, audioBlob.name || 'critica.webm');
+        formData.append('tmdb_movie_id', filmeAtualExpandido.id);
+        const res = await fetch('/api/comentarios/audio', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          mostrarToast('Crítica em áudio publicada! 🎤');
+          audioBlob = null;
+          document.getElementById('audioPreview').style.display = 'none';
+          btn.style.display = 'none';
+          document.getElementById('audioFileInput').value = '';
+          carregarComentarios(filmeAtualExpandido.id);
+        } else {
+          mostrarToast(data.error || 'Erro ao enviar áudio.', 'erro');
+        }
+      } catch (e) {
+        mostrarToast('Erro de conexão ao enviar áudio.', 'erro');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Crítica';
+      }
+    }
+
+    // =========================================
+    // BANNER PREMIUM
+    // =========================================
+    function abrirBannerModal() {
+      fecharDropdownPerfil();
+      document.getElementById('bannerModal').classList.remove('hidden');
+    }
+    function fecharBannerModal() {
+      document.getElementById('bannerModal').classList.add('hidden');
+    }
+    async function salvarBanner() {
+      const file = document.getElementById('bannerInput').files[0];
+      if (!file) { mostrarToast('Selecione uma imagem.', 'erro'); return; }
+      const formData = new FormData();
+      formData.append('banner', file);
+      try {
+        const res = await fetch('/api/perfil/banner', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          usuarioLogado.banner_url = data.url;
+          fecharBannerModal();
+          mostrarToast('Banner de perfil atualizado!');
+          if (typeof abrirPerfilPage === 'function') abrirPerfilPage();
+        } else {
+          mostrarToast(data.error || 'Erro ao salvar banner.', 'erro');
+        }
+      } catch (e) {
+        mostrarToast('Erro de conexão.', 'erro');
+      }
+    }
+
+    // =========================================
+    // AVATAR MINIO (substitui salvarFotoPerfil)
+    // =========================================
+    async function salvarFotoPerfilMinio() {
+      const fileInput = document.getElementById('fotoPerfilInput');
+      const file = fileInput.files[0];
+      if (!file) { mostrarToast('Selecione uma imagem primeiro.', 'erro'); return; }
+      const formData = new FormData();
+      formData.append('avatar', file);
+      try {
+        const res = await fetch('/api/perfil/avatar', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          usuarioLogado.foto_perfil = data.url;
+          usuarioLogado.avatar_url = data.url;
+          localStorage.setItem('foto_perfil_' + usuarioLogado.id, data.url);
+          updateAvatar();
+          fecharFotoModal();
+          mostrarToast('Foto de perfil atualizada e salva no MinIO!');
+        } else {
+          mostrarToast(data.error || 'Erro ao salvar foto.', 'erro');
+        }
+      } catch (e) {
+        mostrarToast('Erro de conexão.', 'erro');
+      }
+    }
+
     iniciarCatalogo();
-    
+
   </script>
   <script src="perfil.js"></script>
 </body>

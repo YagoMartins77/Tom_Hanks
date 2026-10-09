@@ -7,18 +7,83 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const axios = require('axios');
 const mysql = require('mysql2/promise');
+const multer = require('multer');
+const Minio = require('minio');
+const Stripe = require('stripe');
 
 const app = express();
+
+// ─── Stripe ───────────────────────────────────────────────────────────────────
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || '';
+const stripe = Stripe(STRIPE_SECRET_KEY);
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || '';
+const APP_URL = process.env.APP_URL || '';
+
+// ─── MinIO ────────────────────────────────────────────────────────────────────
+const minioClient = new Minio.Client({
+  endPoint:  process.env.MINIO_ENDPOINT || 'minio',
+  port:      Number(process.env.MINIO_PORT) || 9000,
+  useSSL:    false,
+  accessKey: process.env.MINIO_ACCESS_KEY || 'ademiro',
+  secretKey: process.env.MINIO_SECRET_KEY || 'szoboslai'
+});
+
+const AVATAR_BUCKET = 'avatars';
+const AUDIO_BUCKET  = 'audio-reviews';
+const BANNER_BUCKET = 'banners';
+
+async function garantirBuckets() {
+  for (const bucket of [AVATAR_BUCKET, AUDIO_BUCKET, BANNER_BUCKET]) {
+    try {
+      const exists = await minioClient.bucketExists(bucket);
+      if (!exists) {
+        await minioClient.makeBucket(bucket, 'us-east-1');
+        const policy = JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [{ Effect: 'Allow', Principal: { AWS: ['*'] },
+            Action: ['s3:GetObject'], Resource: [`arn:aws:s3:::${bucket}/*`] }]
+        });
+        await minioClient.setBucketPolicy(bucket, policy);
+        console.log(`[MinIO] Bucket '${bucket}' criado e publicado.`);
+      }
+    } catch (e) { console.error(`[MinIO] Erro ao garantir bucket '${bucket}':`, e.message); }
+  }
+}
+garantirBuckets();
+
+// ─── Multer ───────────────────────────────────────────────────────────────────
+const uploadImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Apenas imagens são permitidas.'));
+    cb(null, true);
+  }
+});
+
+const uploadAudio = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm'];
+    if (!allowed.includes(file.mimetype)) return cb(new Error('Formato de áudio não suportado.'));
+    cb(null, true);
+  }
+});
 
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "https://image.tmdb.org", "data:"]
+      styleSrc:    ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      fontSrc:     ["'self'", "https://cdnjs.cloudflare.com"],
+      imgSrc:      ["'self'", "https://image.tmdb.org", "data:", "blob:", "http:", "https:"],
+      mediaSrc:    ["'self'", "blob:", "http:", "https:"],
+      connectSrc:  ["'self'", "http:", "https:"]
     }
   }
 }));
@@ -75,9 +140,25 @@ async function registrarAuditoria(usuario_id, acao, detalhes = '', ip = '') {
   }
 }
 
+// Helper: checa premium no DB
+async function isPremium(userId) {
+  try {
+    const [rows] = await pool.query('SELECT premium FROM usuarios WHERE id = ?', [userId]);
+    return rows.length > 0 && rows[0].premium == 1;
+  } catch { return false; }
+}
+
 // Middleware de Autenticação Comum
 function authMiddleware(req, res, next) {
   if (!req.session.usuario) return res.status(401).json({ error: 'Faça login.' });
+  next();
+}
+
+// Middleware Premium (RBAC)
+async function premiumMiddleware(req, res, next) {
+  if (!req.session.usuario) return res.status(401).json({ error: 'Faça login.' });
+  const ok = await isPremium(req.session.usuario.id);
+  if (!ok) return res.status(403).json({ error: 'Recurso exclusivo para utilizadores Premium.' });
   next();
 }
 
@@ -89,7 +170,6 @@ async function adminMiddleware(req, res, next) {
 
   if (req.session.usuario.role !== 'admin') {
     const ip = getClientIp(req);
-    // AUDITORIA: Tentativa negada de acesso a rota admin (403)
     await registrarAuditoria(
       req.session.usuario.id,
       'tentativa_negada_403',
@@ -141,8 +221,17 @@ app.post('/api/auth/logout', async (req, res) => {
   });
 });
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   if (!req.session.usuario) return res.status(401).json({ error: 'Deslogado' });
+  // Sincroniza status premium da sessão com o DB
+  try {
+    const [rows] = await pool.query('SELECT premium, avatar_url, banner_url FROM usuarios WHERE id = ?', [req.session.usuario.id]);
+    if (rows.length > 0) {
+      req.session.usuario.premium  = rows[0].premium;
+      req.session.usuario.avatar_url = rows[0].avatar_url;
+      req.session.usuario.banner_url = rows[0].banner_url;
+    }
+  } catch {}
   res.json(req.session.usuario);
 });
 
@@ -194,6 +283,247 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 });
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Configuração Pública
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/stripe/config', (req, res) => {
+  res.json({ publishableKey: STRIPE_PUBLISHABLE_KEY });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Checkout Session
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/stripe/checkout', authMiddleware, async (req, res) => {
+  try {
+    // Detecta URL base de retorno dinamicamente para suportar localhost em qualquer porta
+    let baseUrl = APP_URL;
+    if (!baseUrl) {
+      const referer = req.get('referer');
+      if (referer) {
+        try { baseUrl = new URL(referer).origin; } catch {}
+      }
+    }
+    if (!baseUrl) {
+      const host = req.get('host') || 'localhost:8228';
+      baseUrl = `${req.protocol}://${host}`;
+    }
+
+    // Se houver um Price ID configurado, usa ele; senão cria o item de assinatura diretamente
+    const line_items = STRIPE_PRICE_ID
+      ? [{ price: STRIPE_PRICE_ID, quantity: 1 }]
+      : [{
+          price_data: {
+            currency: 'brl',
+            product_data: {
+              name: 'Tom Hanks Fan Club - Assinatura Premium VIP',
+              description: 'Reviews em áudio no MinIO, moldura dourada, badge VIP e uploads de até 10MB'
+            },
+            unit_amount: 1990, // R$ 19,90 por mês
+            recurring: {
+              interval: 'month'
+            }
+          },
+          quantity: 1
+        }];
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items,
+      success_url: `${baseUrl}/?premium=sucesso&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${baseUrl}/?premium=cancelado`,
+      client_reference_id: String(req.session.usuario.id),
+      metadata: { usuario_id: String(req.session.usuario.id) }
+    });
+
+    res.json({ url: checkoutSession.url });
+  } catch (err) {
+    console.error('[Stripe] Erro ao criar checkout:', err.message);
+    res.status(500).json({ error: `Erro ao iniciar o checkout: ${err.message}` });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Verificação de Sessão (Retorno imediato sem necessidade de webhook no localhost)
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/stripe/verify-session', authMiddleware, async (req, res) => {
+  const { session_id } = req.query;
+  if (!session_id) {
+    return res.status(400).json({ error: 'session_id obrigatório' });
+  }
+
+  try {
+    const sess = await stripe.checkout.sessions.retrieve(session_id);
+    if (sess.status === 'complete' || sess.payment_status === 'paid') {
+      const usuarioId = sess.client_reference_id || sess.metadata?.usuario_id || req.session.usuario.id;
+      
+      await pool.query(
+        'UPDATE usuarios SET premium = 1, stripe_customer_id = ? WHERE id = ?',
+        [sess.customer || null, usuarioId]
+      );
+      
+      if (req.session.usuario && req.session.usuario.id == usuarioId) {
+        req.session.usuario.premium = 1;
+      }
+
+      await registrarAuditoria(
+        usuarioId,
+        'upgrade_premium',
+        `Stripe Checkout concluído e confirmado (Sessão: ${sess.id}, Customer: ${sess.customer || 'N/A'})`,
+        getClientIp(req)
+      );
+
+      return res.json({ success: true, premium: true });
+    }
+
+    res.json({ success: false, status: sess.status, payment_status: sess.payment_status });
+  } catch (err) {
+    console.error('[Stripe] Erro ao verificar sessão:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Webhook (raw body antes do express.json)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    let event;
+    try {
+      if (STRIPE_WEBHOOK_SECRET) {
+        const sig = req.headers['stripe-signature'];
+        event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+      } else {
+        event = JSON.parse(req.body.toString());
+      }
+    } catch (err) {
+      console.error('[Stripe Webhook] Assinatura inválida:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const sess = event.data.object;
+      const usuarioId = sess.client_reference_id || sess.metadata?.usuario_id;
+      if (usuarioId) {
+        try {
+          await pool.query(
+            'UPDATE usuarios SET premium = 1, stripe_customer_id = ? WHERE id = ?',
+            [sess.customer, usuarioId]
+          );
+          console.log(`[Stripe] Usuário #${usuarioId} agora é PREMIUM.`);
+          await registrarAuditoria(usuarioId, 'upgrade_premium',
+            `Stripe checkout concluído (customer: ${sess.customer})`, '');
+        } catch (dbErr) {
+          console.error('[Stripe] Erro ao atualizar DB:', dbErr.message);
+        }
+      }
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      const customerId = event.data.object.customer;
+      try {
+        await pool.query('UPDATE usuarios SET premium = 0 WHERE stripe_customer_id = ?', [customerId]);
+        console.log(`[Stripe] Assinatura cancelada para customer ${customerId}.`);
+      } catch {}
+    }
+
+    res.json({ received: true });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINIO — Upload Avatar
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/perfil/avatar', authMiddleware, uploadImage.single('avatar'), async (req, res) => {
+  try {
+    const userId  = req.session.usuario.id;
+    const premium = await isPremium(userId);
+    const maxSize = premium ? 10 * 1024 * 1024 : 1 * 1024 * 1024;
+
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    if (req.file.size > maxSize) {
+      return res.status(400).json({
+        error: premium
+          ? 'Tamanho máximo para Premium é 10 MB.'
+          : 'Utilizadores comuns podem enviar até 1 MB. Assine o Premium para até 10 MB!'
+      });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const objectName = `avatar_${userId}_${Date.now()}.${ext}`;
+    await minioClient.putObject(AVATAR_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+
+    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
+    const avatarUrl = `${minioBase}/${AVATAR_BUCKET}/${objectName}`;
+    await pool.query('UPDATE usuarios SET avatar_url = ? WHERE id = ?', [avatarUrl, userId]);
+    req.session.usuario.avatar_url = avatarUrl;
+
+    await registrarAuditoria(userId, 'upload_avatar', `Avatar salvo no MinIO: ${objectName}`, getClientIp(req));
+    res.json({ url: avatarUrl });
+  } catch (err) {
+    console.error('[MinIO] Erro upload avatar:', err.message);
+    res.status(500).json({ error: 'Erro ao fazer upload do avatar.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINIO — Upload Banner (apenas Premium)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/perfil/banner', premiumMiddleware, uploadImage.single('banner'), async (req, res) => {
+  try {
+    const userId = req.session.usuario.id;
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    if (req.file.size > 10 * 1024 * 1024) return res.status(400).json({ error: 'Máximo 10 MB.' });
+
+    const ext = req.file.originalname.split('.').pop();
+    const objectName = `banner_${userId}_${Date.now()}.${ext}`;
+    await minioClient.putObject(BANNER_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+
+    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
+    const bannerUrl = `${minioBase}/${BANNER_BUCKET}/${objectName}`;
+    await pool.query('UPDATE usuarios SET banner_url = ? WHERE id = ?', [bannerUrl, userId]);
+    req.session.usuario.banner_url = bannerUrl;
+
+    await registrarAuditoria(userId, 'upload_banner', `Banner salvo no MinIO: ${objectName}`, getClientIp(req));
+    res.json({ url: bannerUrl });
+  } catch (err) {
+    console.error('[MinIO] Erro upload banner:', err.message);
+    res.status(500).json({ error: 'Erro ao fazer upload do banner.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINIO — Upload de Crítica em Áudio (apenas Premium)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/comentarios/audio', premiumMiddleware, uploadAudio.single('audio'), async (req, res) => {
+  const ip = getClientIp(req);
+  try {
+    const { tmdb_movie_id } = req.body;
+    if (!tmdb_movie_id) return res.status(400).json({ error: 'tmdb_movie_id é obrigatório.' });
+    if (!req.file)       return res.status(400).json({ error: 'Nenhum arquivo de áudio enviado.' });
+
+    const userId = req.session.usuario.id;
+    const ext = (req.file.originalname.split('.').pop()) || 'webm';
+    const objectName = `audio_${userId}_${tmdb_movie_id}_${Date.now()}.${ext}`;
+    await minioClient.putObject(AUDIO_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+
+    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
+    const audioUrl = `${minioBase}/${AUDIO_BUCKET}/${objectName}`;
+
+    await pool.query(
+      'INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto, audio_url) VALUES (?, ?, ?, ?)',
+      [userId, tmdb_movie_id, '[🎤 Crítica em Áudio]', audioUrl]
+    );
+
+    await registrarAuditoria(userId, 'criar_comentario_audio',
+      `Áudio enviado para Filme ID ${tmdb_movie_id}: ${objectName}`, ip);
+    res.status(201).json({ message: 'Crítica em áudio publicada!', url: audioUrl });
+  } catch (err) {
+    console.error('[MinIO] Erro upload áudio:', err.message);
+    res.status(500).json({ error: 'Erro ao publicar crítica em áudio.' });
+  }
+});
+
 // --- ROTAS DO CATÁLOGO TMDB ---
 app.get('/api/filmes', authMiddleware, async (req, res) => {
   try {
@@ -240,9 +570,10 @@ app.delete('/api/favoritos/:id', authMiddleware, async (req, res) => {
 app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
   try {
     const is_admin = req.session.usuario.role === 'admin';
-    
+
     let sql = `
-      SELECT c.id, c.texto, c.criado_em, c.usuario_id, u.nome, u.email
+      SELECT c.id, c.texto, c.audio_url, c.criado_em, c.usuario_id, u.nome, u.email,
+             COALESCE(u.premium, 0) AS is_premium
       FROM comentarios c
       JOIN usuarios u ON c.usuario_id = u.id
       WHERE c.tmdb_movie_id = ?
@@ -255,7 +586,8 @@ app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
       params.push(req.session.usuario.id);
     }
 
-    sql += ' ORDER BY c.criado_em DESC';
+    // Premium aparecem no topo
+    sql += ' ORDER BY u.premium DESC, c.criado_em DESC';
 
     const [rows] = await pool.query(sql, params);
     res.json(rows);
@@ -337,7 +669,8 @@ app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
 app.get('/api/admin/comentarios', adminMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT c.id, c.tmdb_movie_id, c.texto, c.criado_em, c.usuario_id, u.nome, u.email
+      SELECT c.id, c.tmdb_movie_id, c.texto, c.audio_url, c.criado_em, c.usuario_id,
+             u.nome, u.email, COALESCE(u.premium, 0) AS is_premium
       FROM comentarios c
       JOIN usuarios u ON c.usuario_id = u.id
       ORDER BY c.criado_em DESC
