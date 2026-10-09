@@ -96,3 +96,30 @@ Para a funcionalidade de foto de perfil (que possui um caráter de rede social n
 - **Trade-off (Desvantagem):** Qualquer pessoa que possua a URL exata do objeto no MinIO pode acessar a foto, mesmo sem estar logada. Dado o contexto de uma foto de perfil, essa redução de privacidade é um padrão aceitável e utilizado na maioria das redes sociais (ex: imagens de perfil do GitHub ou Instagram não requerem autenticação para carregar o binário da imagem na tag `<img>`), priorizando assim o desempenho e a escalabilidade.
 
 **Relatório Completo em PDF:** [Clique aqui para abrir o Relatório em PDF](./docs/P1_ISW055_Yago_Martins.pdf)
+
+# Catálogo Tom Hanks - Atividade 7 (Plano Premium com Stripe)
+
+Projeto correspondente à **Atividade 7 - Serviço baseado em pagamento** da disciplina de **Introdução à Computação em Nuvem** (ISW055), ministrada pelo professor **@siriani**.
+
+---
+
+## 📌 Sobre o Projeto
+O catálogo de filmes "Tom Hanks" recebe a implementação de um modelo de assinatura. A cobrança ocorre de forma simulada por meio do provedor de pagamentos **Stripe** (em modo de teste), o que garante a segurança dos usuários, visto que o backend não transaciona nem armazena números de cartão de crédito.
+
+---
+
+## 🚀 Tecnologias e Serviços Utilizados
+- **Node.js** com **Express** e **TypeScript**
+- **Stripe API** (Checkout Sessions e Webhooks)
+- **Banco de Dados** (Armazenamento do status de usuário)
+
+---
+
+## ⚙️ Arquitetura de Pagamento Implementada
+
+1. **Criação do Plano:** Configuração do produto/preço no painel do Stripe em modo de teste (ex: "Plano Premium — R$ 9,90/mês").
+2. **Checkout:** A rota dedicada inicia uma *Checkout Session* e redireciona o usuário para o ambiente seguro do Stripe.
+3. **Webhook:** Um endpoint assíncrono aguarda a notificação do Stripe. Mediante validação da assinatura, o sistema atualiza o status do usuário para `premium: true`.
+4. **Diferenciação de Usuário:** Usuários Premium acessam comportamentos verificáveis e distintos na aplicação, como um selo no perfil e remoção de limite de favoritos.
+
+---
