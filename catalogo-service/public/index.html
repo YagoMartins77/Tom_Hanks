@@ -19,6 +19,7 @@
         <div id="profilePageAvatar" class="profile-page-avatar"></div>
         <div class="profile-page-info">
           <p id="profilePageEmail" style="color:#aaa; margin-bottom:10px;"></p>
+          <div id="profilePageStatusVip" class="profile-status-vip-box" style="margin-bottom:12px;"></div>
           <div class="profile-bio-box">
             <h4 style="color:#e50914; margin-bottom:8px;">Bio</h4>
             <p id="profilePageBio" style="color:#ccc; font-style:italic;">Sem bio ainda.</p>
@@ -199,21 +200,30 @@
         </div>
 
         <div class="premium-price-box">
-          <span class="premium-price">R$ 9,90</span>
+          <span class="premium-price">R$ 19,90</span>
           <span class="premium-period">/mês</span>
-          <p style="font-size:0.78rem; color:#888; margin-top:4px;">Cobrado mensalmente. Cancele a qualquer hora.</p>
-          <p style="font-size:0.75rem; color:#555; margin-top:2px;">Modo de teste — cartão 4242 4242 4242 4242 funciona.</p>
+          <p style="font-size:0.78rem; color:#888; margin-top:4px;">Cobrado mensalmente. Cancele a qualquer momento.</p>
         </div>
 
-        <div id="premiumJaAtivo" style="display:none; text-align:center; margin-top:10px;">
-          <p class="premium-ja-ativo"><i class="fas fa-check-circle"></i> Você já é Premium! Aproveite todos os benefícios.</p>
+        <div id="premiumJaAtivo" style="display:none; text-align:center; margin-top:10px; width:100%;">
+          <div style="background: rgba(255, 193, 7, 0.12); border: 1px solid #ffc107; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <p style="color:#ffc107; font-weight:bold; margin:0;"><i class="fas fa-crown"></i> Assinatura VIP Ativa!</p>
+            <p id="premiumDescricaoStatus" style="color:#ddd; font-size:0.85rem; margin:4px 0 0 0;">Seus benefícios especiais estão liberados.</p>
+          </div>
+          <button id="btnCancelarPremium" class="btn-cancelar-premium" onclick="cancelarAssinaturaStripe()">
+            <i class="fas fa-times-circle"></i> Cancelar Assinatura VIP
+          </button>
         </div>
 
         <button id="btnAssinarPremium" class="btn-assinar-premium" onclick="iniciarCheckoutStripe()">
           <i class="fas fa-bolt"></i> Assinar Agora com Stripe
         </button>
 
-        <p class="premium-seguranca"><i class="fas fa-lock"></i> Pagamento seguro via Stripe. Nunca armazenamos dados de cartão.</p>
+        <button id="btnSincronizarStripe" onclick="sincronizarAssinaturaStripe()" style="background:none; border:none; color:#aaa; font-size:0.82rem; cursor:pointer; margin-bottom:12px; text-decoration:underline;">
+          <i class="fas fa-sync-alt"></i> Já realizou o pagamento? Clique para sincronizar
+        </button>
+
+        <p class="premium-seguranca"><i class="fas fa-lock"></i> Pagamento seguro via Stripe. Cancele quando quiser.</p>
       </div>
     </div>
   </div>
@@ -389,20 +399,31 @@
           if (btnAdmin) btnAdmin.style.display = 'inline-flex';
         }
 
-        // Botão Premium: esconder se já for premium, mostrar badge no dropdown
-        if (usuarioLogado.premium) {
-          const btnPremium = document.getElementById('btnPremium');
+        // Configuração de UI para VIP / Admin
+        const isVip = usuarioLogado.role === 'admin' || usuarioLogado.premium;
+        const btnPremium = document.getElementById('btnPremium');
+        const badge = document.getElementById('dropdownPremiumBadge');
+        const btnBanner = document.getElementById('btnBannerDropdown');
+        const fotoLimite = document.getElementById('fotoLimitTexto');
+
+        if (isVip) {
           if (btnPremium) {
-            btnPremium.innerHTML = '<i class="fas fa-crown"></i> Premium <span style="font-size:0.7em;color:#ffc107;">✓</span>';
+            btnPremium.innerHTML = usuarioLogado.role === 'admin'
+              ? '<i class="fas fa-shield-alt"></i> Admin VIP'
+              : '<i class="fas fa-crown"></i> VIP Ativo <span style="font-size:0.7em;color:#ffc107;">✓</span>';
             btnPremium.classList.add('btn-premium-ativo');
           }
-          const badge = document.getElementById('dropdownPremiumBadge');
           if (badge) badge.style.display = 'inline-block';
-          const btnBanner = document.getElementById('btnBannerDropdown');
           if (btnBanner) btnBanner.style.display = 'flex';
-          // Atualiza info de limite de foto
-          const fotoLimite = document.getElementById('fotoLimitTexto');
           if (fotoLimite) fotoLimite.textContent = '10 MB';
+        } else {
+          if (btnPremium) {
+            btnPremium.innerHTML = '<i class="fas fa-crown"></i> Premium';
+            btnPremium.classList.remove('btn-premium-ativo');
+          }
+          if (badge) badge.style.display = 'none';
+          if (btnBanner) btnBanner.style.display = 'none';
+          if (fotoLimite) fotoLimite.textContent = '1 MB';
         }
 
         // Verifica parâmetro na URL (retorno do Stripe)
@@ -411,31 +432,25 @@
           const sessionId = params.get('session_id');
           if (sessionId) {
             try {
-              await fetch(`/api/stripe/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+              const vRes = await fetch(`/api/stripe/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+              const vData = await vRes.json();
+              if (vData.success) {
+                usuarioLogado.premium = 1;
+              }
               // Recarregar dados atualizados do usuário
               const freshRes = await fetch('/api/auth/me');
               if (freshRes.ok) {
                 usuarioLogado = await freshRes.json();
-                if (usuarioLogado.premium) {
-                  const btnPremium = document.getElementById('btnPremium');
-                  if (btnPremium) {
-                    btnPremium.innerHTML = '<i class="fas fa-crown"></i> Premium <span style="font-size:0.7em;color:#ffc107;">✓</span>';
-                    btnPremium.classList.add('btn-premium-ativo');
-                  }
-                  const badge = document.getElementById('dropdownPremiumBadge');
-                  if (badge) badge.style.display = 'inline-block';
-                  const btnBanner = document.getElementById('btnBannerDropdown');
-                  if (btnBanner) btnBanner.style.display = 'flex';
-                  const fotoLimite = document.getElementById('fotoLimitTexto');
-                  if (fotoLimite) fotoLimite.textContent = '10 MB';
-                }
               }
             } catch (e) {
               console.error('Erro ao verificar sessão do Stripe:', e);
             }
           }
-          setTimeout(() => mostrarToast('🌟 Bem-vindo ao Premium! Seus benefícios estão ativos.', 'premium'), 500);
+          setTimeout(() => mostrarToast('🌟 Bem-vindo ao VIP! Seus benefícios estão ativos.', 'premium'), 500);
           window.history.replaceState({}, '', window.location.pathname);
+          // Atualiza UI com novo status VIP
+          iniciarCatalogo();
+          return;
         } else if (params.get('premium') === 'cancelado') {
           setTimeout(() => mostrarToast('Assinatura cancelada. Tente novamente quando quiser.', 'erro'), 500);
           window.history.replaceState({}, '', window.location.pathname);
@@ -508,9 +523,9 @@
       document.getElementById('filmeModal').classList.remove('hidden');
       document.getElementById('novoComentario').value = '';
 
-      // Seção de áudio: exibe apenas para premium
+      // Seção de áudio: exibe para membros VIP e administradores
       const secaoAudio = document.getElementById('secaoAudio');
-      if (secaoAudio) secaoAudio.style.display = (usuarioLogado && usuarioLogado.premium) ? 'block' : 'none';
+      if (secaoAudio) secaoAudio.style.display = (usuarioLogado && (usuarioLogado.premium || usuarioLogado.role === 'admin')) ? 'block' : 'none';
       // Limpa pré-visualização de áudio
       audioBlob = null;
       const audioPreview = document.getElementById('audioPreview');
@@ -851,18 +866,92 @@
     function abrirPremiumModal() {
       const modal = document.getElementById('premiumModal');
       modal.classList.remove('hidden');
-      // Se já é premium, esconde botão de assinar
-      if (usuarioLogado && usuarioLogado.premium) {
-        document.getElementById('premiumJaAtivo').style.display = 'block';
-        document.getElementById('btnAssinarPremium').style.display = 'none';
+
+      const isVip = usuarioLogado && (usuarioLogado.premium || usuarioLogado.role === 'admin');
+      const boxJaAtivo = document.getElementById('premiumJaAtivo');
+      const btnAssinar = document.getElementById('btnAssinarPremium');
+      const btnSync = document.getElementById('btnSincronizarStripe');
+      const descStatus = document.getElementById('premiumDescricaoStatus');
+      const btnCancelar = document.getElementById('btnCancelarPremium');
+
+      if (isVip) {
+        boxJaAtivo.style.display = 'block';
+        btnAssinar.style.display = 'none';
+        if (btnSync) btnSync.style.display = 'none';
+
+        if (usuarioLogado.role === 'admin') {
+          if (descStatus) descStatus.textContent = 'Você é Administrador e possui acesso VIP liberado.';
+          if (btnCancelar) btnCancelar.style.display = 'none';
+        } else {
+          if (descStatus) descStatus.textContent = 'Sua assinatura VIP está ativa. Críticas em áudio e 10 MB liberados!';
+          if (btnCancelar) btnCancelar.style.display = 'flex';
+        }
       } else {
-        document.getElementById('premiumJaAtivo').style.display = 'none';
-        document.getElementById('btnAssinarPremium').style.display = 'flex';
+        boxJaAtivo.style.display = 'none';
+        btnAssinar.style.display = 'flex';
+        if (btnSync) btnSync.style.display = 'inline-block';
       }
     }
 
     function fecharPremiumModal() {
       document.getElementById('premiumModal').classList.add('hidden');
+    }
+
+    async function cancelarAssinaturaStripe() {
+      if (!confirm('Deseja realmente cancelar sua assinatura VIP? Seus benefícios de áudio e 10 MB serão desativados.')) return;
+      const btn = document.getElementById('btnCancelarPremium');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelando assinatura...';
+      }
+      try {
+        const res = await fetch('/api/stripe/cancelar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          mostrarToast('Assinatura cancelada com sucesso.');
+          if (usuarioLogado.role !== 'admin') {
+            usuarioLogado.premium = 0;
+          }
+          fecharPremiumModal();
+          iniciarCatalogo();
+        } else {
+          mostrarToast(data.error || 'Erro ao cancelar assinatura.', 'erro');
+        }
+      } catch (e) {
+        mostrarToast('Erro de conexão com o servidor.', 'erro');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-times-circle"></i> Cancelar Assinatura VIP';
+        }
+      }
+    }
+
+    async function sincronizarAssinaturaStripe() {
+      const btn = document.getElementById('btnSincronizarStripe');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando Stripe...';
+      }
+      try {
+        const res = await fetch('/api/stripe/sincronizar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          mostrarToast('🌟 Assinatura VIP reconhecida e ativa!', 'premium');
+          usuarioLogado.premium = 1;
+          fecharPremiumModal();
+          iniciarCatalogo();
+        } else {
+          mostrarToast(data.message || 'Nenhuma assinatura ativa encontrada para este usuário no Stripe.', 'erro');
+        }
+      } catch (e) {
+        mostrarToast('Erro ao sincronizar com Stripe.', 'erro');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-sync-alt"></i> Já realizou o pagamento? Clique para sincronizar';
+        }
+      }
     }
 
     async function iniciarCheckoutStripe() {

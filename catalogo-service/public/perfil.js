@@ -68,6 +68,26 @@ function updateAvatar() {
     }
   }
 
+  // Atualiza badge de plano no dropdown
+  const badge = document.getElementById('dropdownPremiumBadge');
+  if (badge) {
+    if (usuarioLogado.role === 'admin') {
+      badge.style.display = 'inline-block';
+      badge.innerHTML = '<i class="fas fa-shield-alt"></i> Admin VIP';
+      badge.style.background = 'rgba(229, 9, 20, 0.2)';
+      badge.style.borderColor = '#e50914';
+      badge.style.color = '#ff6b6b';
+    } else if (usuarioLogado.premium) {
+      badge.style.display = 'inline-block';
+      badge.innerHTML = '⭐ Membro VIP';
+      badge.style.background = 'rgba(255, 193, 7, 0.2)';
+      badge.style.borderColor = '#ffc107';
+      badge.style.color = '#ffc107';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
   // Bio salva
   const bioSalva = localStorage.getItem('bio_' + usuarioLogado.id);
   if (bioSalva) usuarioLogado.bio = bioSalva;
@@ -200,6 +220,36 @@ async function abrirPerfilPage() {
   // Preenche dados da página de perfil
   document.getElementById('profilePageNome').textContent = usuarioLogado.nome;
   document.getElementById('profilePageEmail').textContent = usuarioLogado.email;
+
+  // Renderiza texto e status de Membro VIP no Perfil
+  const statusBox = document.getElementById('profilePageStatusVip');
+  if (statusBox) {
+    if (usuarioLogado.role === 'admin') {
+      statusBox.innerHTML = `
+        <div style="background: rgba(229, 9, 20, 0.15); border: 1px solid #e50914; border-radius: 8px; padding: 10px 14px; display: inline-flex; align-items: center; gap: 10px; color: #fff;">
+          <i class="fas fa-shield-alt" style="color: #e50914; font-size: 1.3rem;"></i>
+          <div>
+            <div style="font-weight: bold; color: #fff; font-size: 0.95rem;">Administrador do Sistema</div>
+            <div style="font-size: 0.8rem; color: #bbb;">Todos os privilégios e recursos VIP estão inclusos.</div>
+          </div>
+        </div>`;
+    } else if (usuarioLogado.premium) {
+      statusBox.innerHTML = `
+        <div style="background: linear-gradient(135deg, rgba(255,193,7,0.18), rgba(184,134,11,0.25)); border: 1px solid #ffc107; border-radius: 8px; padding: 10px 14px; display: inline-flex; align-items: center; gap: 10px; color: #fff; box-shadow: 0 0 15px rgba(255,193,7,0.2);">
+          <i class="fas fa-crown" style="color: #ffc107; font-size: 1.3rem;"></i>
+          <div>
+            <div style="font-weight: bold; color: #ffc107; font-size: 0.95rem;">Membro VIP Ativo ✨</div>
+            <div style="font-size: 0.8rem; color: #ddd;">Assinatura ativa. Críticas em áudio, moldura dourada e uploads de 10 MB liberados.</div>
+          </div>
+        </div>`;
+    } else {
+      statusBox.innerHTML = `
+        <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 8px; color: #aaa; font-size: 0.85rem;">
+          <i class="fas fa-user"></i>
+          <span>Membro Comum — <a href="javascript:void(0)" onclick="fecharPerfilPage(); abrirPremiumModal();" style="color:#ffc107; font-weight:600; text-decoration:underline;">Tornar-se Membro VIP</a></span>
+        </div>`;
+    }
+  }
 
   const bio = localStorage.getItem('bio_' + usuarioLogado.id) || 'Sem bio ainda.';
   document.getElementById('profilePageBio').textContent = bio;

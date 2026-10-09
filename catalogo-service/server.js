@@ -100,6 +100,45 @@ const pool = mysql.createPool({
   port: Number(process.env.DB_PORT) || 3306
 });
 
+// Auto-migração para garantir colunas necessárias sem quebrar queries
+async function migrarBanco() {
+  const colunasUsuarios = [
+    { nome: 'premium', tipo: 'TINYINT(1) DEFAULT 0' },
+    { nome: 'stripe_customer_id', tipo: 'VARCHAR(255) NULL' },
+    { nome: 'avatar_url', tipo: 'VARCHAR(500) NULL' },
+    { nome: 'banner_url', tipo: 'VARCHAR(500) NULL' }
+  ];
+
+  for (const c of colunasUsuarios) {
+    try {
+      await pool.query(`ALTER TABLE usuarios ADD COLUMN ${c.nome} ${c.tipo}`);
+      console.log(`[DB] Coluna usuarios.${c.nome} adicionada.`);
+    } catch (err) {
+      // 1060 = ER_DUP_FIELDNAME (coluna já existe)
+      if (err.errno !== 1060 && err.code !== 'ER_DUP_FIELDNAME') {
+        console.warn(`[DB] Aviso ao checar usuarios.${c.nome}:`, err.message);
+      }
+    }
+  }
+
+  const colunasComentarios = [
+    { nome: 'audio_url', tipo: 'VARCHAR(500) NULL' },
+    { nome: 'fixado', tipo: 'TINYINT(1) DEFAULT 0' }
+  ];
+
+  for (const c of colunasComentarios) {
+    try {
+      await pool.query(`ALTER TABLE comentarios ADD COLUMN ${c.nome} ${c.tipo}`);
+      console.log(`[DB] Coluna comentarios.${c.nome} adicionada.`);
+    } catch (err) {
+      if (err.errno !== 1060 && err.code !== 'ER_DUP_FIELDNAME') {
+        console.warn(`[DB] Aviso ao checar comentarios.${c.nome}:`, err.message);
+      }
+    }
+  }
+}
+migrarBanco().catch(e => console.error('[DB] Erro nas migrações:', e.message));
+
 const sessionStore = new MySQLStore({}, pool);
 app.use(session({
   key: 'session_cookie',
@@ -140,12 +179,16 @@ async function registrarAuditoria(usuario_id, acao, detalhes = '', ip = '') {
   }
 }
 
-// Helper: checa premium no DB
-async function isPremium(userId) {
+// Helper: checa premium no DB ou se é admin (Admins ganham recursos VIP automaticamente)
+async function isPremiumOrAdmin(req) {
+  if (!req.session?.usuario) return false;
+  if (req.session.usuario.role === 'admin') return true;
   try {
-    const [rows] = await pool.query('SELECT premium FROM usuarios WHERE id = ?', [userId]);
-    return rows.length > 0 && rows[0].premium == 1;
-  } catch { return false; }
+    const [rows] = await pool.query('SELECT premium, role FROM usuarios WHERE id = ?', [req.session.usuario.id]);
+    return rows.length > 0 && (rows[0].premium == 1 || rows[0].role === 'admin');
+  } catch {
+    return req.session.usuario.premium == 1;
+  }
 }
 
 // Middleware de Autenticação Comum
@@ -154,11 +197,11 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// Middleware Premium (RBAC)
+// Middleware Premium (RBAC) - Admins possuem todos os recursos VIP liberados
 async function premiumMiddleware(req, res, next) {
   if (!req.session.usuario) return res.status(401).json({ error: 'Faça login.' });
-  const ok = await isPremium(req.session.usuario.id);
-  if (!ok) return res.status(403).json({ error: 'Recurso exclusivo para utilizadores Premium.' });
+  const ok = await isPremiumOrAdmin(req);
+  if (!ok) return res.status(403).json({ error: 'Recurso exclusivo para utilizadores VIP ou Administradores.' });
   next();
 }
 
@@ -223,13 +266,15 @@ app.post('/api/auth/logout', async (req, res) => {
 
 app.get('/api/auth/me', async (req, res) => {
   if (!req.session.usuario) return res.status(401).json({ error: 'Deslogado' });
-  // Sincroniza status premium da sessão com o DB
+  // Sincroniza status premium e perfil da sessão com o DB
   try {
-    const [rows] = await pool.query('SELECT premium, avatar_url, banner_url FROM usuarios WHERE id = ?', [req.session.usuario.id]);
+    const [rows] = await pool.query('SELECT role, premium, avatar_url, banner_url, stripe_customer_id FROM usuarios WHERE id = ?', [req.session.usuario.id]);
     if (rows.length > 0) {
-      req.session.usuario.premium  = rows[0].premium;
+      req.session.usuario.role = rows[0].role;
+      req.session.usuario.premium  = (rows[0].role === 'admin' || rows[0].premium == 1) ? 1 : 0;
       req.session.usuario.avatar_url = rows[0].avatar_url;
       req.session.usuario.banner_url = rows[0].banner_url;
+      req.session.usuario.stripe_customer_id = rows[0].stripe_customer_id;
     }
   } catch {}
   res.json(req.session.usuario);
@@ -329,6 +374,7 @@ app.post('/api/stripe/checkout', authMiddleware, async (req, res) => {
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items,
+      customer_email: req.session.usuario.email || undefined,
       success_url: `${baseUrl}/?premium=sucesso&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${baseUrl}/?premium=cancelado`,
       client_reference_id: String(req.session.usuario.id),
@@ -356,19 +402,24 @@ app.get('/api/stripe/verify-session', authMiddleware, async (req, res) => {
     if (sess.status === 'complete' || sess.payment_status === 'paid') {
       const usuarioId = sess.client_reference_id || sess.metadata?.usuario_id || req.session.usuario.id;
       
-      await pool.query(
-        'UPDATE usuarios SET premium = 1, stripe_customer_id = ? WHERE id = ?',
-        [sess.customer || null, usuarioId]
-      );
+      try {
+        await pool.query(
+          'UPDATE usuarios SET premium = 1, stripe_customer_id = ? WHERE id = ?',
+          [sess.customer || null, usuarioId]
+        );
+      } catch (dbErr) {
+        console.warn('[Stripe] Erro ao atualizar DB na verificação:', dbErr.message);
+      }
       
       if (req.session.usuario && req.session.usuario.id == usuarioId) {
         req.session.usuario.premium = 1;
+        req.session.usuario.stripe_customer_id = sess.customer || null;
       }
 
       await registrarAuditoria(
         usuarioId,
         'upgrade_premium',
-        `Stripe Checkout concluído e confirmado (Sessão: ${sess.id}, Customer: ${sess.customer || 'N/A'})`,
+        `Stripe Checkout concluído e verificado (Sessão: ${sess.id}, Customer: ${sess.customer || 'N/A'})`,
         getClientIp(req)
       );
 
@@ -379,6 +430,126 @@ app.get('/api/stripe/verify-session', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[Stripe] Erro ao verificar sessão:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Sincronizar Assinatura (para usuários que já pagaram ou retorno pendente)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/stripe/sincronizar', authMiddleware, async (req, res) => {
+  try {
+    const usuario = req.session.usuario;
+
+    // Se for admin, já tem os benefícios VIP
+    if (usuario.role === 'admin') {
+      req.session.usuario.premium = 1;
+      return res.json({ success: true, premium: true, message: 'Administrador possui todos os benefícios VIP.' });
+    }
+
+    let customerId = usuario.stripe_customer_id;
+
+    // Se não tem customerId, busca na Stripe pelo e-mail
+    if (!customerId && usuario.email) {
+      try {
+        const customers = await stripe.customers.list({ email: usuario.email.trim().toLowerCase(), limit: 1 });
+        if (customers.data.length > 0) {
+          customerId = customers.data[0].id;
+        }
+      } catch {}
+    }
+
+    let isSubscribed = false;
+
+    // Checa subscriptions ativas
+    if (customerId) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: 'active',
+          limit: 1
+        });
+        if (subscriptions.data.length > 0) {
+          isSubscribed = true;
+        }
+      } catch {}
+    }
+
+    // Se não encontrou pelo customer, checa as últimas checkout sessions pagas
+    if (!isSubscribed) {
+      try {
+        const sessions = await stripe.checkout.sessions.list({ limit: 15 });
+        const userSession = sessions.data.find(s =>
+          (s.customer_email === usuario.email || s.customer_details?.email === usuario.email || s.client_reference_id == usuario.id) &&
+          (s.payment_status === 'paid' || s.status === 'complete')
+        );
+        if (userSession) {
+          isSubscribed = true;
+          customerId = userSession.customer || customerId;
+        }
+      } catch {}
+    }
+
+    if (isSubscribed) {
+      await pool.query(
+        'UPDATE usuarios SET premium = 1, stripe_customer_id = ? WHERE id = ?',
+        [customerId || null, usuario.id]
+      );
+      req.session.usuario.premium = 1;
+      req.session.usuario.stripe_customer_id = customerId;
+      await registrarAuditoria(usuario.id, 'upgrade_premium', `Assinatura Stripe sincronizada e confirmada (${customerId})`, getClientIp(req));
+      return res.json({ success: true, premium: true, message: 'Assinatura VIP reconhecida e ativa!' });
+    }
+
+    res.json({ success: false, premium: false, message: 'Nenhuma assinatura ativa encontrada para este usuário no Stripe.' });
+  } catch (err) {
+    console.error('[Stripe] Erro ao sincronizar:', err.message);
+    res.status(500).json({ error: 'Erro ao sincronizar: ' + err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE — Cancelar Assinatura VIP
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/stripe/cancelar', authMiddleware, async (req, res) => {
+  try {
+    const usuario = req.session.usuario;
+    let customerId = usuario.stripe_customer_id;
+
+    if (!customerId && usuario.email) {
+      try {
+        const customers = await stripe.customers.list({ email: usuario.email.trim().toLowerCase(), limit: 1 });
+        if (customers.data.length > 0) {
+          customerId = customers.data[0].id;
+        }
+      } catch {}
+    }
+
+    let canceladas = 0;
+    if (customerId) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: 'active'
+        });
+        for (const sub of subscriptions.data) {
+          await stripe.subscriptions.cancel(sub.id);
+          canceladas++;
+        }
+      } catch (subErr) {
+        console.warn('[Stripe] Erro ao cancelar subscriptions:', subErr.message);
+      }
+    }
+
+    await pool.query('UPDATE usuarios SET premium = 0 WHERE id = ?', [usuario.id]);
+    if (usuario.role !== 'admin') {
+      req.session.usuario.premium = 0;
+    }
+
+    await registrarAuditoria(usuario.id, 'cancelar_premium', `Assinatura VIP cancelada (${canceladas} ativas removidas no Stripe)`, getClientIp(req));
+    res.json({ success: true, message: 'Assinatura VIP cancelada com sucesso.' });
+  } catch (err) {
+    console.error('[Stripe] Erro ao cancelar:', err.message);
+    res.status(500).json({ error: 'Erro ao cancelar assinatura: ' + err.message });
   }
 });
 
@@ -573,7 +744,8 @@ app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
 
     let sql = `
       SELECT c.id, c.texto, c.audio_url, c.criado_em, c.usuario_id, u.nome, u.email,
-             COALESCE(u.premium, 0) AS is_premium
+             (CASE WHEN u.role = 'admin' OR u.premium = 1 THEN 1 ELSE 0 END) AS is_premium,
+             u.role
       FROM comentarios c
       JOIN usuarios u ON c.usuario_id = u.id
       WHERE c.tmdb_movie_id = ?
@@ -586,13 +758,34 @@ app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
       params.push(req.session.usuario.id);
     }
 
-    // Premium aparecem no topo
-    sql += ' ORDER BY u.premium DESC, c.criado_em DESC';
+    // Admins e Premiums aparecem no topo
+    sql += ' ORDER BY (u.role = "admin" OR u.premium = 1) DESC, c.criado_em DESC';
 
     const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao buscar comentários' });
+    console.warn('[Comentarios] Erro com query completa, executando fallback compatível:', err.message);
+    try {
+      let fallbackSql = `
+        SELECT c.id, c.texto, NULL AS audio_url, c.criado_em, c.usuario_id, u.nome, u.email,
+               (CASE WHEN u.role = 'admin' THEN 1 ELSE 0 END) AS is_premium,
+               u.role
+        FROM comentarios c
+        JOIN usuarios u ON c.usuario_id = u.id
+        WHERE c.tmdb_movie_id = ?
+      `;
+      const fallbackParams = [req.params.id];
+      if (req.session.usuario.role !== 'admin') {
+        fallbackSql += ' AND c.usuario_id = ?';
+        fallbackParams.push(req.session.usuario.id);
+      }
+      fallbackSql += ' ORDER BY (u.role = "admin") DESC, c.criado_em DESC';
+      const [fallbackRows] = await pool.query(fallbackSql, fallbackParams);
+      res.json(fallbackRows);
+    } catch (fbErr) {
+      console.error('[Comentarios] Erro total ao buscar comentários:', fbErr.message);
+      res.status(500).json({ error: 'Erro ao buscar comentários' });
+    }
   }
 });
 
@@ -665,12 +858,12 @@ app.delete('/api/comentarios/:id', authMiddleware, async (req, res) => {
 
 // --- ROTAS DO PAINEL ADMINISTRATIVO ---
 
-// 1. Listar todos os comentários para moderação do admin
 app.get('/api/admin/comentarios', adminMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT c.id, c.tmdb_movie_id, c.texto, c.audio_url, c.criado_em, c.usuario_id,
-             u.nome, u.email, COALESCE(u.premium, 0) AS is_premium
+             u.nome, u.email, (CASE WHEN u.role = 'admin' OR u.premium = 1 THEN 1 ELSE 0 END) AS is_premium,
+             u.role
       FROM comentarios c
       JOIN usuarios u ON c.usuario_id = u.id
       ORDER BY c.criado_em DESC
@@ -678,8 +871,22 @@ app.get('/api/admin/comentarios', adminMiddleware, async (req, res) => {
     `);
     res.json(rows);
   } catch (err) {
-    console.error('Erro ao listar comentários para admin:', err);
-    res.status(500).json({ error: 'Erro ao carregar comentários para moderação.' });
+    console.warn('[Admin Comentarios] Tentando fallback:', err.message);
+    try {
+      const [fallbackRows] = await pool.query(`
+        SELECT c.id, c.tmdb_movie_id, c.texto, NULL AS audio_url, c.criado_em, c.usuario_id,
+               u.nome, u.email, (CASE WHEN u.role = 'admin' THEN 1 ELSE 0 END) AS is_premium,
+               u.role
+        FROM comentarios c
+        JOIN usuarios u ON c.usuario_id = u.id
+        ORDER BY c.criado_em DESC
+        LIMIT 100
+      `);
+      res.json(fallbackRows);
+    } catch (fbErr) {
+      console.error('Erro crítico ao listar comentários para admin:', fbErr.message);
+      res.status(500).json({ error: 'Erro ao carregar comentários para moderação.' });
+    }
   }
 });
 

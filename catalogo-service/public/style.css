@@ -1036,4 +1036,38 @@ hr { border: 0; height: 1px; background: #333; margin: 20px 0; }
    ========================================= */
 .badge-premium { background: rgba(255,193,7,0.2); color: #ffc107; border: 1px solid rgba(255,193,7,0.4); }
 
+/* =========================================
+   CANCELAR ASSINATURA & STATUS PERFIL
+   ========================================= */
+.btn-cancelar-premium {
+  width: 100%;
+  background: rgba(229, 9, 20, 0.15);
+  border: 1px solid #e50914;
+  color: #ff6b6b;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  margin-top: 10px;
+}
+.btn-cancelar-premium:hover:not(:disabled) {
+  background: #e50914;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+}
+.btn-cancelar-premium:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-status-vip-box {
+  margin: 12px 0 16px 0;
+}
 
