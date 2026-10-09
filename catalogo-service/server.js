@@ -34,6 +34,12 @@ const AVATAR_BUCKET = 'avatars';
 const AUDIO_BUCKET  = 'audio-reviews';
 const BANNER_BUCKET = 'banners';
 
+// Helper para normalizar URLs de storage (resolve URLs legadas com host 'minio:9003' ou 'localhost:9003')
+function normalizarStorageUrl(url) {
+  if (!url) return null;
+  return url.replace(/^https?:\/\/[^/]+\/(audio-reviews|avatars|banners)\//, '/api/storage/$1/');
+}
+
 async function garantirBuckets() {
   for (const bucket of [AVATAR_BUCKET, AUDIO_BUCKET, BANNER_BUCKET]) {
     try {
@@ -272,8 +278,8 @@ app.get('/api/auth/me', async (req, res) => {
     if (rows.length > 0) {
       req.session.usuario.role = rows[0].role;
       req.session.usuario.premium  = (rows[0].role === 'admin' || rows[0].premium == 1) ? 1 : 0;
-      req.session.usuario.avatar_url = rows[0].avatar_url;
-      req.session.usuario.banner_url = rows[0].banner_url;
+      req.session.usuario.avatar_url = normalizarStorageUrl(rows[0].avatar_url);
+      req.session.usuario.banner_url = normalizarStorageUrl(rows[0].banner_url);
       req.session.usuario.stripe_customer_id = rows[0].stripe_customer_id;
     }
   } catch {}
@@ -624,8 +630,7 @@ app.post('/api/perfil/avatar', authMiddleware, uploadImage.single('avatar'), asy
     const objectName = `avatar_${userId}_${Date.now()}.${ext}`;
     await minioClient.putObject(AVATAR_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
 
-    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
-    const avatarUrl = `${minioBase}/${AVATAR_BUCKET}/${objectName}`;
+    const avatarUrl = `/api/storage/${AVATAR_BUCKET}/${objectName}`;
     await pool.query('UPDATE usuarios SET avatar_url = ? WHERE id = ?', [avatarUrl, userId]);
     req.session.usuario.avatar_url = avatarUrl;
 
@@ -650,8 +655,7 @@ app.post('/api/perfil/banner', premiumMiddleware, uploadImage.single('banner'), 
     const objectName = `banner_${userId}_${Date.now()}.${ext}`;
     await minioClient.putObject(BANNER_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
 
-    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
-    const bannerUrl = `${minioBase}/${BANNER_BUCKET}/${objectName}`;
+    const bannerUrl = `/api/storage/${BANNER_BUCKET}/${objectName}`;
     await pool.query('UPDATE usuarios SET banner_url = ? WHERE id = ?', [bannerUrl, userId]);
     req.session.usuario.banner_url = bannerUrl;
 
@@ -678,8 +682,7 @@ app.post('/api/comentarios/audio', premiumMiddleware, uploadAudio.single('audio'
     const objectName = `audio_${userId}_${tmdb_movie_id}_${Date.now()}.${ext}`;
     await minioClient.putObject(AUDIO_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
 
-    const minioBase = `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT_PUBLIC || 9003}`;
-    const audioUrl = `${minioBase}/${AUDIO_BUCKET}/${objectName}`;
+    const audioUrl = `/api/storage/${AUDIO_BUCKET}/${objectName}`;
 
     await pool.query(
       'INSERT INTO comentarios (usuario_id, tmdb_movie_id, texto, audio_url) VALUES (?, ?, ?, ?)',
@@ -692,6 +695,29 @@ app.post('/api/comentarios/audio', premiumMiddleware, uploadAudio.single('audio'
   } catch (err) {
     console.error('[MinIO] Erro upload áudio:', err.message);
     res.status(500).json({ error: 'Erro ao publicar crítica em áudio.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINIO — Proxy Seguro de Mídia (resolve DNS Docker 'minio' e bloqueios de CSP)
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/storage/:bucket/:objectName', async (req, res) => {
+  try {
+    const { bucket, objectName } = req.params;
+    const allowed = [AVATAR_BUCKET, AUDIO_BUCKET, BANNER_BUCKET];
+    if (!allowed.includes(bucket)) return res.status(403).json({ error: 'Bucket inválido.' });
+
+    const stat = await minioClient.statObject(bucket, objectName);
+    res.setHeader('Content-Type', stat.metaData['content-type'] || 'audio/mpeg');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    const stream = await minioClient.getObject(bucket, objectName);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('[Storage Proxy] Erro ao buscar objeto:', err.message);
+    res.status(404).json({ error: 'Mídia não encontrada.' });
   }
 });
 
@@ -762,7 +788,11 @@ app.get('/api/comentarios/:id', authMiddleware, async (req, res) => {
     sql += ' ORDER BY (u.role = "admin" OR u.premium = 1) DESC, c.criado_em DESC';
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    const tratadas = rows.map(c => ({
+      ...c,
+      audio_url: normalizarStorageUrl(c.audio_url)
+    }));
+    res.json(tratadas);
   } catch (err) {
     console.warn('[Comentarios] Erro com query completa, executando fallback compatível:', err.message);
     try {
@@ -869,7 +899,11 @@ app.get('/api/admin/comentarios', adminMiddleware, async (req, res) => {
       ORDER BY c.criado_em DESC
       LIMIT 100
     `);
-    res.json(rows);
+    const tratadas = rows.map(c => ({
+      ...c,
+      audio_url: normalizarStorageUrl(c.audio_url)
+    }));
+    res.json(tratadas);
   } catch (err) {
     console.warn('[Admin Comentarios] Tentando fallback:', err.message);
     try {
