@@ -42,7 +42,10 @@ function updateAvatar() {
 
   // Verifica foto salva no localStorage
   const fotoSalva = localStorage.getItem('foto_perfil_' + usuarioLogado.id);
-  if (fotoSalva && !usuarioLogado.foto_perfil) {
+  if (usuarioLogado.avatar_url) {
+    // Foto guardada no MinIO (vale em qualquer dispositivo)
+    usuarioLogado.foto_perfil = usuarioLogado.avatar_url;
+  } else if (fotoSalva && !usuarioLogado.foto_perfil) {
     usuarioLogado.foto_perfil = fotoSalva;
   }
 
@@ -57,7 +60,7 @@ function updateAvatar() {
     // Mostra foto
     if (avatarImg) { avatarImg.src = usuarioLogado.foto_perfil; avatarImg.style.display = 'block'; }
     if (avatarInitials) avatarInitials.style.display = 'none';
-    if (dropdownAvatar) dropdownAvatar.style.backgroundImage = `url(${usuarioLogado.foto_perfil})`;
+    if (dropdownAvatar) { dropdownAvatar.textContent = ''; dropdownAvatar.style.backgroundImage = `url("${usuarioLogado.foto_perfil}")`; }
   } else {
     // Mostra iniciais
     if (avatarImg) avatarImg.style.display = 'none';
@@ -256,15 +259,27 @@ async function abrirPerfilPage() {
 
   // Avatar na página de perfil
   const avatar = document.getElementById('profilePageAvatar');
-  const foto = localStorage.getItem('foto_perfil_' + usuarioLogado.id) || usuarioLogado.foto_perfil;
+  const foto = usuarioLogado.avatar_url || localStorage.getItem('foto_perfil_' + usuarioLogado.id) || usuarioLogado.foto_perfil;
   if (foto) {
-    avatar.style.backgroundImage = `url(${foto})`;
+    avatar.style.backgroundImage = `url("${foto}")`;
     avatar.textContent = '';
   } else {
     const partes = usuarioLogado.nome.trim().split(' ');
     const iniciais = partes.length >= 2 ? partes[0][0] + partes[1][0] : partes[0].substring(0, 2);
     avatar.textContent = iniciais.toUpperCase();
     avatar.style.backgroundImage = '';
+  }
+
+  // Banner do perfil (recurso VIP/Admin): é guardado no MinIO e só faltava ser exibido
+  const bannerEl = document.getElementById('profilePageBanner');
+  if (bannerEl) {
+    if (usuarioLogado.banner_url) {
+      bannerEl.style.backgroundImage = `url("${usuarioLogado.banner_url}")`;
+      bannerEl.style.display = 'block';
+    } else {
+      bannerEl.style.backgroundImage = '';
+      bannerEl.style.display = 'none';
+    }
   }
 
   // Carrega favoritos

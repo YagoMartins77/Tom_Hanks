@@ -40,41 +40,87 @@ function normalizarStorageUrl(url) {
   return url.replace(/^https?:\/\/[^/]+\/(audio-reviews|avatars|banners)\//, '/api/storage/$1/');
 }
 
-async function garantirBuckets() {
-  for (const bucket of [AVATAR_BUCKET, AUDIO_BUCKET, BANNER_BUCKET]) {
+// Garante UM bucket (cria + política de leitura pública se ainda não existir).
+async function garantirBucket(bucket) {
+  const exists = await minioClient.bucketExists(bucket);
+  if (exists) return;
+  try {
+    await minioClient.makeBucket(bucket, 'us-east-1');
+  } catch (e) {
+    // Outra requisição pode ter criado o bucket no mesmo instante
+    if (e.code !== 'BucketAlreadyOwnedByYou' && e.code !== 'BucketAlreadyExists') throw e;
+  }
+  const policy = JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [{ Effect: 'Allow', Principal: { AWS: ['*'] },
+      Action: ['s3:GetObject'], Resource: [`arn:aws:s3:::${bucket}/*`] }]
+  });
+  await minioClient.setBucketPolicy(bucket, policy);
+  console.log(`[MinIO] Bucket '${bucket}' criado e publicado.`);
+}
+
+// No docker-compose, "depends_on" só espera o container do MinIO iniciar, não ficar pronto.
+// Por isso tentamos várias vezes na subida (antes, uma falha única deixava os buckets sem existir
+// e todo upload dava erro 500 até reiniciar o serviço).
+async function garantirBuckets(tentativas = 20) {
+  for (let i = 1; i <= tentativas; i++) {
     try {
-      const exists = await minioClient.bucketExists(bucket);
-      if (!exists) {
-        await minioClient.makeBucket(bucket, 'us-east-1');
-        const policy = JSON.stringify({
-          Version: '2012-10-17',
-          Statement: [{ Effect: 'Allow', Principal: { AWS: ['*'] },
-            Action: ['s3:GetObject'], Resource: [`arn:aws:s3:::${bucket}/*`] }]
-        });
-        await minioClient.setBucketPolicy(bucket, policy);
-        console.log(`[MinIO] Bucket '${bucket}' criado e publicado.`);
-      }
-    } catch (e) { console.error(`[MinIO] Erro ao garantir bucket '${bucket}':`, e.message); }
+      for (const bucket of [AVATAR_BUCKET, AUDIO_BUCKET, BANNER_BUCKET]) await garantirBucket(bucket);
+      return;
+    } catch (e) {
+      console.error(`[MinIO] Tentativa ${i}/${tentativas} de garantir buckets falhou:`, e.message);
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
 }
 garantirBuckets();
 
+// Extensão segura para o nome do objeto (derivada do tipo real do arquivo, não do nome enviado)
+const EXT_POR_MIME = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+  'image/svg+xml': 'svg', 'image/avif': 'avif', 'image/bmp': 'bmp',
+  'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/webm': 'webm'
+};
+function mimeBase(file) {
+  return String(file?.mimetype || '').split(';')[0].trim().toLowerCase();
+}
+function extensaoSegura(file, padrao) {
+  const m = mimeBase(file);
+  if (EXT_POR_MIME[m]) return EXT_POR_MIME[m];
+  const ext = String(file?.originalname || '').split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5);
+  return ext || padrao;
+}
+
 // ─── Multer ───────────────────────────────────────────────────────────────────
+// Erro de validação de upload (vira resposta 400 em JSON no handler global, no fim do arquivo)
+function erroUpload(msg) {
+  const e = new Error(msg);
+  e.status = 400;
+  return e;
+}
+
 const uploadImage = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) return cb(new Error('Apenas imagens são permitidas.'));
+    if (!file.mimetype.startsWith('image/')) return cb(erroUpload('Apenas imagens são permitidas.'));
     cb(null, true);
   }
 });
 
+// Crítica em áudio: no máximo 15 segundos.
+// O limite de tempo é aplicado pelo gravador do navegador (para sozinho aos 15 s). Como o servidor
+// não consegue medir a duração de um webm gravado no navegador, aqui há um teto de tamanho como
+// proteção extra: 15 s de áudio comprimido ocupam ~120-240 KB, então 512 KB barra áudios longos.
+const AUDIO_MAX_SEGUNDOS = 15;
+const AUDIO_MAX_BYTES = 512 * 1024;
 const uploadAudio = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: AUDIO_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     const allowed = ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm'];
-    if (!allowed.includes(file.mimetype)) return cb(new Error('Formato de áudio não suportado.'));
+    // O navegador pode enviar "audio/webm;codecs=opus": compara só o tipo base
+    if (!allowed.includes(mimeBase(file))) return cb(erroUpload('Formato de áudio não suportado.'));
     cb(null, true);
   }
 });
@@ -614,7 +660,8 @@ app.post('/api/stripe/webhook',
 app.post('/api/perfil/avatar', authMiddleware, uploadImage.single('avatar'), async (req, res) => {
   try {
     const userId  = req.session.usuario.id;
-    const premium = await isPremium(userId);
+    // Admin também tem recursos VIP (foto de até 10 MB)
+    const premium = await isPremiumOrAdmin(req);
     const maxSize = premium ? 10 * 1024 * 1024 : 1 * 1024 * 1024;
 
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -626,9 +673,10 @@ app.post('/api/perfil/avatar', authMiddleware, uploadImage.single('avatar'), asy
       });
     }
 
-    const ext = req.file.originalname.split('.').pop();
+    const ext = extensaoSegura(req.file, 'img');
     const objectName = `avatar_${userId}_${Date.now()}.${ext}`;
-    await minioClient.putObject(AVATAR_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+    await garantirBucket(AVATAR_BUCKET);
+    await minioClient.putObject(AVATAR_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': mimeBase(req.file) });
 
     const avatarUrl = `/api/storage/${AVATAR_BUCKET}/${objectName}`;
     await pool.query('UPDATE usuarios SET avatar_url = ? WHERE id = ?', [avatarUrl, userId]);
@@ -637,7 +685,7 @@ app.post('/api/perfil/avatar', authMiddleware, uploadImage.single('avatar'), asy
     await registrarAuditoria(userId, 'upload_avatar', `Avatar salvo no MinIO: ${objectName}`, getClientIp(req));
     res.json({ url: avatarUrl });
   } catch (err) {
-    console.error('[MinIO] Erro upload avatar:', err.message);
+    console.error('[MinIO] Erro upload avatar:', err);
     res.status(500).json({ error: 'Erro ao fazer upload do avatar.' });
   }
 });
@@ -651,9 +699,10 @@ app.post('/api/perfil/banner', premiumMiddleware, uploadImage.single('banner'), 
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     if (req.file.size > 10 * 1024 * 1024) return res.status(400).json({ error: 'Máximo 10 MB.' });
 
-    const ext = req.file.originalname.split('.').pop();
+    const ext = extensaoSegura(req.file, 'img');
     const objectName = `banner_${userId}_${Date.now()}.${ext}`;
-    await minioClient.putObject(BANNER_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+    await garantirBucket(BANNER_BUCKET);
+    await minioClient.putObject(BANNER_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': mimeBase(req.file) });
 
     const bannerUrl = `/api/storage/${BANNER_BUCKET}/${objectName}`;
     await pool.query('UPDATE usuarios SET banner_url = ? WHERE id = ?', [bannerUrl, userId]);
@@ -662,7 +711,7 @@ app.post('/api/perfil/banner', premiumMiddleware, uploadImage.single('banner'), 
     await registrarAuditoria(userId, 'upload_banner', `Banner salvo no MinIO: ${objectName}`, getClientIp(req));
     res.json({ url: bannerUrl });
   } catch (err) {
-    console.error('[MinIO] Erro upload banner:', err.message);
+    console.error('[MinIO] Erro upload banner:', err);
     res.status(500).json({ error: 'Erro ao fazer upload do banner.' });
   }
 });
@@ -678,9 +727,17 @@ app.post('/api/comentarios/audio', premiumMiddleware, uploadAudio.single('audio'
     if (!req.file)       return res.status(400).json({ error: 'Nenhum arquivo de áudio enviado.' });
 
     const userId = req.session.usuario.id;
-    const ext = (req.file.originalname.split('.').pop()) || 'webm';
-    const objectName = `audio_${userId}_${tmdb_movie_id}_${Date.now()}.${ext}`;
-    await minioClient.putObject(AUDIO_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': req.file.mimetype });
+    if (req.file.size > AUDIO_MAX_BYTES) {
+      return res.status(400).json({ error: `Áudio muito longo. O limite é de ${AUDIO_MAX_SEGUNDOS} segundos.` });
+    }
+
+    const ext = extensaoSegura(req.file, 'webm');
+    // tmdb_movie_id vira parte do nome do objeto: só aceita número
+    const filmeId = String(tmdb_movie_id).replace(/[^0-9]/g, '');
+    if (!filmeId) return res.status(400).json({ error: 'tmdb_movie_id inválido.' });
+    const objectName = `audio_${userId}_${filmeId}_${Date.now()}.${ext}`;
+    await garantirBucket(AUDIO_BUCKET);
+    await minioClient.putObject(AUDIO_BUCKET, objectName, req.file.buffer, req.file.size, { 'Content-Type': mimeBase(req.file) });
 
     const audioUrl = `/api/storage/${AUDIO_BUCKET}/${objectName}`;
 
@@ -693,7 +750,7 @@ app.post('/api/comentarios/audio', premiumMiddleware, uploadAudio.single('audio'
       `Áudio enviado para Filme ID ${tmdb_movie_id}: ${objectName}`, ip);
     res.status(201).json({ message: 'Crítica em áudio publicada!', url: audioUrl });
   } catch (err) {
-    console.error('[MinIO] Erro upload áudio:', err.message);
+    console.error('[MinIO] Erro upload áudio:', err);
     res.status(500).json({ error: 'Erro ao publicar crítica em áudio.' });
   }
 });
@@ -712,8 +769,15 @@ app.get('/api/storage/:bucket/:objectName', async (req, res) => {
     res.setHeader('Content-Length', stat.size);
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    // Arquivos enviados por usuários nunca podem executar script na nossa origem
+    // (ex.: um SVG com <script> aberto diretamente pela URL). Em <img>/<audio> não muda nada.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
 
     const stream = await minioClient.getObject(bucket, objectName);
+    stream.on('error', (e) => {
+      console.error('[Storage Proxy] Erro no stream:', e.message);
+      res.destroy();
+    });
     stream.pipe(res);
   } catch (err) {
     console.error('[Storage Proxy] Erro ao buscar objeto:', err.message);
@@ -955,6 +1019,31 @@ app.delete('/api/logs/:id', adminMiddleware, async (req, res) => {
     console.error('Erro ao apagar log no log-service:', err.message);
     res.status(err.response?.status || 500).json(err.response?.data || { error: 'Erro ao apagar log de auditoria.' });
   }
+});
+
+// Erros de upload (multer) e validações viram JSON com mensagem clara.
+// Sem isso, arquivo grande demais ou formato inválido virava uma página HTML de erro 500.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const ehAudio = req.originalUrl.startsWith('/api/comentarios/audio');
+      return res.status(413).json({
+        error: ehAudio
+          ? `Áudio muito longo. O limite é de ${AUDIO_MAX_SEGUNDOS} segundos.`
+          : 'Arquivo muito grande. O máximo permitido é 10 MB.'
+      });
+    }
+    return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+  }
+
+  if (err && err.status === 400) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  console.error('[Erro não tratado]', err);
+  res.status(500).json({ error: 'Erro interno do servidor.' });
 });
 
 const PORT = process.env.PORT || 3000;
