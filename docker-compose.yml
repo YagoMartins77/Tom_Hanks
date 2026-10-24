@@ -25,11 +25,22 @@ services:
       - DB_NAME=IAC_2026_02_yago_martins
       - DB_PORT=3306
       - SESSION_SECRET=${SESSION_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID}
+      - APP_URL=${APP_URL}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_PORT_PUBLIC=${MINIO_PORT_PUBLIC:-9003}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-ademiro}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-szoboslai}
     networks:
       - app-network
     depends_on:
       - auth-service
       - log-service
+      - minio
 
   auth-service:
     build: ./auth-service
@@ -76,11 +87,13 @@ services:
       - "9003:9000"
       - "9004:9001" 
     environment:
-      MINIO_ROOT_USER: ademiro
-      MINIO_ROOT_PASSWORD: szoboslai
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-ademiro}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-szoboslai}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    networks:
+      - app-network
 
 volumes:
   minio_data: 
