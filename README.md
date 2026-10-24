@@ -96,3 +96,45 @@ Para a funcionalidade de foto de perfil (que possui um caráter de rede social n
 - **Trade-off (Desvantagem):** Qualquer pessoa que possua a URL exata do objeto no MinIO pode acessar a foto, mesmo sem estar logada. Dado o contexto de uma foto de perfil, essa redução de privacidade é um padrão aceitável e utilizado na maioria das redes sociais (ex: imagens de perfil do GitHub ou Instagram não requerem autenticação para carregar o binário da imagem na tag `<img>`), priorizando assim o desempenho e a escalabilidade.
 
 **Relatório Completo em PDF:** [Clique aqui para abrir o Relatório em PDF](./docs/P1_ISW055_Yago_Martins.pdf)
+
+## 📌 Sobre o Projeto
+O catálogo de filmes "Tom Hanks" recebe a implementação de um modelo de assinatura. A cobrança ocorre de forma simulada por meio do provedor de pagamentos **Stripe** (em modo de teste), o que garante a segurança dos usuários, visto que o backend não transaciona nem armazena números de cartão de crédito.
+
+---
+
+## 🚀 Tecnologias e Serviços Utilizados
+- **Node.js** com **Express** e **TypeScript**
+- **Stripe API** (Checkout Sessions e Webhooks)
+- **Banco de Dados** (Armazenamento do status de usuário)
+
+---
+
+## ⚙️ Arquitetura de Pagamento Implementada
+
+1. **Criação do Plano:** Configuração do produto/preço no painel do Stripe em modo de teste (ex: "Plano Premium — R$ 9,90/mês").
+2. **Checkout:** A rota dedicada inicia uma *Checkout Session* e redireciona o usuário para o ambiente seguro do Stripe.
+3. **Webhook:** Um endpoint assíncrono aguarda a notificação do Stripe. Mediante validação da assinatura, o sistema atualiza o status do usuário para `premium: true`.
+4. **Diferenciação de Usuário:** Usuários Premium acessam comportamentos verificáveis e distintos na aplicação, como um selo no perfil e remoção de limite de favoritos.
+
+---
+
+Atividade 8 — Classificação SaaS / PaaS / IaaS
+
+A classificação abaixo considera quanto da pilha eu gerencio em cada peça do sistema. A documentação reversa completa (especificação, arquitetura, regras de negócio e modelo de dados) está em DOCUMENTACAO.md.
+
+Peça do sistema	Camada	Justificativa
+VM Proxmox (Ubuntu + Docker)	IaaS	Recebo apenas a máquina virtual, e eu mesmo instalo e administro o sistema operacional e o Docker.
+Portainer	PaaS	Faço o deploy da stack do docker-compose.yml por uma interface web, sem acessar o servidor para rodar comandos Docker manualmente.
+catalogo-service (Node + Express)	PaaS	Entrego só o código e o Dockerfile; o container cuida do runtime Node, da rede interna e do restart, sem eu reinstalar SO.
+auth-service (Node + Express)	PaaS	Mesmo modelo: faço o deploy do meu código em container e o runtime vem pronto na imagem.
+log-service (Node + Express)	PaaS	Mesmo modelo: container com meu código, sem administrar o SO a cada deploy.
+redis-auditoria (imagem redis:alpine)	PaaS	Uso uma imagem pronta do Redis e apenas configuro e subo o container.
+minio (imagem minio/minio)	PaaS	Subo o armazenamento de objetos a partir de uma imagem pronta; a plataforma de containers cuida da execução.
+MariaDB externo	PaaS	Uso o banco apenas por host, usuário e senha; não instalo nem administro o servidor onde ele roda.
+Stripe	SaaS	Consumo o checkout e as assinaturas por API e webhook, sem hospedar nada de pagamento.
+Brevo (SMTP)	SaaS	Consumo um serviço pronto de envio de e-mail transacional por SMTP.
+TMDB	SaaS	Consumo a base de filmes por API, sem hospedar nenhum dado de filmes.
+
+O mesmo projeto atravessa as três camadas ao mesmo tempo: administro o sistema operacional da VM (IaaS), faço deploy dos meus containers pelo Portainer sem me preocupar em reinstalar SO (PaaS) e delego pagamento, e-mail e dados de filmes a produtos prontos de terceiros (SaaS).
+
+Professor: @siriani
